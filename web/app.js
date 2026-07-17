@@ -46,8 +46,10 @@ const youtubePlayerHost = document.getElementById('youtubePlayerHost');
 const fullArt = document.getElementById('fullArt');
 const fullPlayerModeText = document.getElementById('fullPlayerModeText');
 
+let currentUser = null;
+
 // --- Initialization ---
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
     // Load YouTube API
     const tag = document.createElement('script');
     tag.src = "https://www.youtube.com/iframe_api";
@@ -67,6 +69,22 @@ document.addEventListener("DOMContentLoaded", () => {
         const user = window.Telegram.WebApp.initDataUnsafe?.user;
         if (user) {
             document.getElementById('greetingText').textContent = `Good afternoon, ${user.first_name}`;
+            
+            // Authenticate with backend Phase 2 Database
+            try {
+                const res = await fetch('/api/auth', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: user })
+                });
+                const authData = await res.json();
+                if (authData.user) {
+                    currentUser = authData.user;
+                    console.log("Authenticated as:", currentUser.username || currentUser.display_name);
+                }
+            } catch (e) {
+                console.error("Auth failed", e);
+            }
         }
     }
 });

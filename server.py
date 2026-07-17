@@ -19,6 +19,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
 
 import yt_dlp
+import db
 
 # Fix for Pyrogram import on Python 3.10+
 try:
@@ -349,6 +350,23 @@ async def api_create_room_handler(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
+async def api_auth_handler(request):
+    try:
+        data = await request.json()
+        user = data.get('user')
+        if not user or not user.get('id'):
+            return web.json_response({'error': 'Invalid user data'}, status=400)
+            
+        tg_id = user['id']
+        username = user.get('username', '')
+        display_name = user.get('first_name', 'User')
+        
+        # Get or create user in DB
+        db_user = await db.get_or_create_user(tg_id, username, display_name)
+        return web.json_response({'user': db_user})
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
 # ─── Web Application Setup & Middleware ─────────────────────────────────────────
 @web.middleware
 async def ngrok_skip_warning_middleware(request, handler):
@@ -362,6 +380,7 @@ def setup_web_app(app):
     app.router.add_get('/api/stream', api_stream_handler)
     app.router.add_get('/api/video', api_video_handler)
     app.router.add_post('/api/room/create', api_create_room_handler)
+    app.router.add_post('/api/auth', api_auth_handler)
     app.router.add_get('/ws/room/{room_code}', websocket_room_handler)
 
     web_app_dir = os.path.join(os.path.dirname(__file__), 'web')
@@ -378,19 +397,22 @@ async def main():
     print("  🚀 AURASOUND AI — AUDIO & VIDEO SYNC ENGINE")
     print("=" * 60)
 
-    print("[1/4] Starting Telegram Bots...")
+    print("[0/5] Initializing Database...")
+    await db.init_db()
+
+    print("[1/5] Starting Telegram Bots...")
     await python_bot.start()
     await mojo_bot.start()
 
     print("[2/4] Spawning Server Heartbeat Sync Loop...")
     asyncio.create_task(room_heartbeat_loop())
 
-    print("[3/4] Setting Up Web App Routes...")
+    print("[3/5] Setting Up Web App Routes...")
     app = web.Application(middlewares=[ngrok_skip_warning_middleware])
     setup_web_app(app)
 
     port = int(os.environ.get('PORT', 8000))
-    print(f"[4/4] Starting Web Server on port {port}...")
+    print(f"[4/5] Starting Web Server on port {port}...")
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, '0.0.0.0', port)
