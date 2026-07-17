@@ -189,6 +189,7 @@ async def broadcast_room_state(room_code, room, message_type='SERVER_STATE'):
         'is_video': room.get('is_video', False),
         'current_position': room_position(room, now),
         'members': room['members'],
+        'queue': room.get('queue', []),
         'server_time': now,
     })
     dead_sockets = []
@@ -206,9 +207,21 @@ async def room_heartbeat_loop():
     while True:
         try:
             now = time.time()
+            rooms_to_delete = []
             for code, room in list(sync_rooms.items()):
                 if room['sockets']:
+                    room['empty_since'] = None
                     await broadcast_room_state(code, room, 'SERVER_HEARTBEAT')
+                else:
+                    if room.get('empty_since') is None:
+                        room['empty_since'] = now
+                    elif now - room['empty_since'] > 300: # 5 minutes timeout
+                        rooms_to_delete.append(code)
+            
+            for code in rooms_to_delete:
+                del sync_rooms[code]
+                asyncio.create_task(db.delete_room(code))
+                print(f"[Room Cleanup] Deleted empty room #{code}")
         except Exception as e:
             print(f"[Heartbeat Loop Error] {e}")
         await asyncio.sleep(1.0)
@@ -235,7 +248,9 @@ async def websocket_room_handler(request):
                 'is_playing': db_room.get('is_playing', False),
                 'is_video': db_room.get('is_video', False),
                 'start_time': db_room.get('start_time', time.time()),
-                'pause_offset': db_room.get('pause_offset', 0)
+                'pause_offset': db_room.get('pause_offset', 0),
+                'queue': db_room.get('queue', []),
+                'empty_since': None
             }
         else:
             sync_rooms[room_code] = {
@@ -246,7 +261,9 @@ async def websocket_room_handler(request):
                 'is_playing': False,
                 'is_video': False,
                 'start_time': time.time(),
-                'pause_offset': 0
+                'pause_offset': 0,
+                'queue': [],
+                'empty_since': None
             }
 
     room = sync_rooms[room_code]
@@ -273,6 +290,7 @@ async def websocket_room_handler(request):
         'is_playing': room['is_playing'],
         'is_video': room.get('is_video', False),
         'current_position': current_pos,
+        'queue': room.get('queue', []),
         'recent_messages': recent_messages
     }))
 
@@ -317,6 +335,20 @@ async def websocket_room_handler(request):
                         room['start_time'] = time.time() - pos
                     print(f"[Room #{room_code}] SEEK to {pos}s")
                     await broadcast_room_state(room_code, room)
+                    
+                elif action_type == 'ACTION_QUEUE_ADD':
+                    track = data.get('track')
+                    if track:
+                        room.setdefault('queue', []).append(track)
+                        await broadcast_room_state(room_code, room)
+                        asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], room['is_playing'], room['is_video'], room['start_time'], room['pause_offset'], room['queue']))
+
+                elif action_type == 'ACTION_QUEUE_REMOVE':
+                    index = data.get('index', -1)
+                    if 0 <= index < len(room.get('queue', [])):
+                        room['queue'].pop(index)
+                        await broadcast_room_state(room_code, room)
+                        asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], room['is_playing'], room['is_video'], room['start_time'], room['pause_offset'], room['queue']))
                     
                 elif action_type == 'ACTION_CHAT_MESSAGE':
                     text = data.get('text', '').strip()
@@ -645,7 +677,18 @@ async def api_ai_recommendations_handler(request):
 async def api_ai_dj_voice_handler(request):
     data = await request.json()
     track_title = data.get('title', '')
-    commentary = AIEngine.generate_dj_commentary(track_title)
+    mood = data.get('mood', 'chill')
+    
+    # Try to load history from DB if user_id is provided, else fallback to passed array
+    user_id = data.get('user_id')
+    history = data.get('history', [])
+    if user_id:
+        try:
+            history = await db.get_liked_songs(user_id)
+        except Exception:
+            pass
+            
+    commentary = await AIEngine.generate_dj_commentary(track_title, mood, history)
     return web.json_response({'commentary': commentary})
 
 # ─── Web Application Setup & Security Middleware ───────────────────────────────

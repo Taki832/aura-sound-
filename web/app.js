@@ -364,17 +364,28 @@ async function performSearch(query) {
 
 // --- Queue System ---
 function addToQueue(track) {
-    playQueue.push(track);
+    if (roomCode && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ACTION_QUEUE_ADD', track: track }));
+    } else {
+        playQueue.push(track);
+        updateQueueUI();
+    }
     showToast(`Added "${track.title.substring(0, 30)}..." to queue`);
-    updateQueueUI();
 }
 
 function playNextInQueue() {
     queueIndex++;
     if (queueIndex < playQueue.length) {
-        playTrack(playQueue[queueIndex], false);
+        if (roomCode) {
+            // Auto play next song for the whole room if we are the host
+            if (isRoomHost) {
+                playTrack(playQueue[queueIndex], false); // Defaults to audio mode when autoplaying next
+            }
+        } else {
+            playTrack(playQueue[queueIndex], false);
+        }
     } else {
-        showToast("Queue finished");
+        if (!roomCode || isRoomHost) showToast("Queue finished");
     }
 }
 
@@ -398,9 +409,13 @@ function updateQueueUI() {
 }
 
 function removeFromQueue(index) {
-    playQueue.splice(index, 1);
-    if (index <= queueIndex) queueIndex--;
-    updateQueueUI();
+    if (roomCode && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ACTION_QUEUE_REMOVE', index: index }));
+    } else {
+        playQueue.splice(index, 1);
+        if (index <= queueIndex) queueIndex--;
+        updateQueueUI();
+    }
     showToast("Removed from queue");
 }
 
@@ -753,13 +768,29 @@ function handleServerState(state) {
     roomPauseOffset = state.pause_offset || state.current_position;
     lastHeartbeatPos = state.current_position;
 
-    // Member List
+    // Member List & True Host Transfer
     if (state.members) {
+        const user = window.Telegram?.WebApp?.initDataUnsafe?.user?.first_name || "Listener";
+        if (state.members.length > 0 && state.members[0] === user) {
+            if (!isRoomHost) {
+                isRoomHost = true;
+                showToast("You are now the Room Host!");
+            }
+        } else {
+            isRoomHost = false;
+        }
+
         document.getElementById('memberCount').textContent = state.members.length;
         document.getElementById('membersUl').innerHTML = state.members.map((m, i) => `<li>${m} ${i===0?'(Host)':''}</li>`).join('');
         if (window.auraIsland) {
             window.auraIsland.setMembers(state.members);
         }
+    }
+
+    // Sync Queue
+    if (state.queue) {
+        playQueue = state.queue;
+        updateQueueUI();
     }
 
     // Apply Track changes

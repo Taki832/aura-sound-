@@ -82,9 +82,15 @@ async def init_db():
                 is_video INTEGER DEFAULT 0,
                 start_time REAL DEFAULT 0,
                 pause_offset REAL DEFAULT 0,
+                queue_json TEXT DEFAULT '[]',
                 updated_at INTEGER
             )
         ''')
+        
+        try:
+            await db.execute("ALTER TABLE rooms ADD COLUMN queue_json TEXT DEFAULT '[]'")
+        except Exception:
+            pass # Column already exists
 
         # Search Cache Table (Deduplication & Rate Limit Prevention)
         await db.execute('''
@@ -133,13 +139,14 @@ async def init_db():
         await db.commit()
 
 # --- ROOM PERSISTENCE FUNCTIONS ---
-async def save_room_state(room_code, name, host_id, track_data, is_playing, is_video, start_time, pause_offset):
+async def save_room_state(room_code, name, host_id, track_data, is_playing, is_video, start_time, pause_offset, queue_data=None):
     now = int(time.time())
     track_json = json.dumps(track_data) if track_data else None
+    queue_json = json.dumps(queue_data) if queue_data else '[]'
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''
-            INSERT INTO rooms (room_code, name, host_id, current_track_json, is_playing, is_video, start_time, pause_offset, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO rooms (room_code, name, host_id, current_track_json, is_playing, is_video, start_time, pause_offset, queue_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(room_code) DO UPDATE SET
                 name=excluded.name,
                 host_id=excluded.host_id,
@@ -148,8 +155,9 @@ async def save_room_state(room_code, name, host_id, track_data, is_playing, is_v
                 is_video=excluded.is_video,
                 start_time=excluded.start_time,
                 pause_offset=excluded.pause_offset,
+                queue_json=excluded.queue_json,
                 updated_at=excluded.updated_at
-        ''', (room_code, name, host_id, track_json, 1 if is_playing else 0, 1 if is_video else 0, start_time, pause_offset, now))
+        ''', (room_code, name, host_id, track_json, 1 if is_playing else 0, 1 if is_video else 0, start_time, pause_offset, queue_json, now))
         await db.commit()
 
 async def load_room_state(room_code):
@@ -159,6 +167,7 @@ async def load_room_state(room_code):
             if row:
                 d = dict(zip([col[0] for col in cursor.description], row))
                 d['current_track'] = json.loads(d['current_track_json']) if d.get('current_track_json') else None
+                d['queue'] = json.loads(d['queue_json']) if d.get('queue_json') else []
                 d['is_playing'] = bool(d['is_playing'])
                 d['is_video'] = bool(d['is_video'])
                 return d
