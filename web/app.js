@@ -60,6 +60,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupSearch();
     setupRoomUI();
     setupPlayerControls();
+    setupSettings();
     
     // Setup Telegram WebApp
     if (window.Telegram && window.Telegram.WebApp) {
@@ -91,6 +92,20 @@ document.addEventListener("DOMContentLoaded", async () => {
                     if (currentUser.theme === 'light') {
                         document.body.classList.add('light-theme');
                     }
+                    
+                    // Apply Settings
+                    try {
+                        const settings = JSON.parse(currentUser.settings_json || '{}');
+                        document.getElementById('settingAmoled').checked = settings.amoled || false;
+                        document.getElementById('settingGapless').checked = settings.gapless !== false;
+                        document.getElementById('settingHqAudio').checked = settings.hqAudio !== false;
+                        document.getElementById('settingGlassEffects').checked = settings.glassEffects !== false;
+                        
+                        if(settings.amoled) document.body.style.backgroundColor = '#000000';
+                        if(settings.glassEffects === false) {
+                            document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
+                        }
+                    } catch(e) {}
                 }
             } catch (e) {
                 console.error("Auth failed", e);
@@ -426,9 +441,38 @@ function setupRoomUI() {
         document.getElementById('roomSetupState').classList.remove('hidden');
         document.getElementById('roomActiveState').classList.add('hidden');
         document.getElementById('fullRoomSyncIcon').style.color = '#fff';
+        document.getElementById('chatMessages').innerHTML = ''; // Clear chat
         pauseLocal();
         showToast("Left Sync Room");
     });
+
+    // Chat UI logic
+    const chatInput = document.getElementById('chatInput');
+    const sendChat = () => {
+        const text = chatInput.value.trim();
+        if (text && ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'ACTION_CHAT_MESSAGE',
+                text: text,
+                user_id: window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 0
+            }));
+            chatInput.value = '';
+        }
+    };
+    document.getElementById('btnSendChat').addEventListener('click', sendChat);
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') sendChat();
+    });
+}
+
+function appendChatMessage(msg) {
+    const chatDiv = document.getElementById('chatMessages');
+    const msgEl = document.createElement('div');
+    const isSelf = window.Telegram?.WebApp?.initDataUnsafe?.user?.id === msg.user_id;
+    msgEl.className = 'chat-msg' + (isSelf ? ' self' : '');
+    msgEl.innerHTML = `<span class="chat-msg-user">${msg.username || 'User'}</span>${msg.text}`;
+    chatDiv.appendChild(msgEl);
+    chatDiv.scrollTop = chatDiv.scrollHeight;
 }
 
 async function initRoom(asHost, asVideoRoom, code = "") {
@@ -468,6 +512,12 @@ async function initRoom(asHost, asVideoRoom, code = "") {
         const data = JSON.parse(msg.data);
         if (data.type === 'INIT_ROOM_STATE' || data.type === 'SERVER_STATE' || data.type === 'SERVER_HEARTBEAT') {
             handleServerState(data);
+            if (data.type === 'INIT_ROOM_STATE' && data.recent_messages) {
+                document.getElementById('chatMessages').innerHTML = '';
+                data.recent_messages.forEach(appendChatMessage);
+            }
+        } else if (data.type === 'CHAT_MESSAGE') {
+            appendChatMessage(data.message);
         }
     };
     
@@ -529,4 +579,39 @@ function showToast(msg) {
     t.textContent = msg;
     t.classList.remove('hidden');
     setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+function setupSettings() {
+    const updateSettings = async () => {
+        if (!currentUser) return;
+        const settings = {
+            amoled: document.getElementById('settingAmoled').checked,
+            gapless: document.getElementById('settingGapless').checked,
+            hqAudio: document.getElementById('settingHqAudio').checked,
+            glassEffects: document.getElementById('settingGlassEffects').checked
+        };
+        
+        // Immediate UI updates
+        document.body.style.backgroundColor = settings.amoled ? '#000000' : '#121212';
+        document.documentElement.style.setProperty('--glass-bg', settings.glassEffects ? 'rgba(24, 24, 24, 0.7)' : 'rgba(18,18,18,1)');
+
+        try {
+            await fetch('/api/profile/update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: currentUser.id,
+                    settings_json: JSON.stringify(settings)
+                })
+            });
+            showToast("Settings saved");
+        } catch(e) {
+            console.error("Failed to save settings", e);
+        }
+    };
+
+    document.getElementById('settingAmoled')?.addEventListener('change', updateSettings);
+    document.getElementById('settingGapless')?.addEventListener('change', updateSettings);
+    document.getElementById('settingHqAudio')?.addEventListener('change', updateSettings);
+    document.getElementById('settingGlassEffects')?.addEventListener('change', updateSettings);
 }

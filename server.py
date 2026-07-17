@@ -219,6 +219,14 @@ async def websocket_room_handler(request):
 
     now = time.time()
     current_pos = room_position(room, now)
+    
+    # Load recent chat messages for this room from SQLite
+    try:
+        recent_messages = await db.get_room_messages(room_code, limit=50)
+    except Exception as e:
+        print(f"[WebSocket] Error loading messages: {e}")
+        recent_messages = []
+
     await ws.send_str(json.dumps({
         'type': 'INIT_ROOM_STATE',
         'room_code': room_code,
@@ -226,7 +234,8 @@ async def websocket_room_handler(request):
         'track': room['current_track'],
         'is_playing': room['is_playing'],
         'is_video': room.get('is_video', False),
-        'current_position': current_pos
+        'current_position': current_pos,
+        'recent_messages': recent_messages
     }))
 
     try:
@@ -268,6 +277,19 @@ async def websocket_room_handler(request):
                         room['start_time'] = time.time() - pos
                     print(f"[Room #{room_code}] SEEK to {pos}s")
                     await broadcast_room_state(room_code, room)
+                    
+                elif action_type == 'ACTION_CHAT_MESSAGE':
+                    text = data.get('text', '').strip()
+                    user_id = data.get('user_id', 0)
+                    if text:
+                        saved_msg = await db.save_chat_message(room_code, user_id, user_name, text)
+                        # Broadcast message to room
+                        msg_payload = json.dumps({'type': 'CHAT_MESSAGE', 'message': saved_msg})
+                        for s in room['sockets']:
+                            try:
+                                await s.send_str(msg_payload)
+                            except Exception:
+                                pass
 
             elif msg.type == WSMsgType.ERROR:
                 print(f"[WebSocket Error] {ws.exception()}")
@@ -367,6 +389,27 @@ async def api_auth_handler(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
+async def api_update_profile_handler(request):
+    try:
+        data = await request.json()
+        user_id = data.get('id')
+        if not user_id:
+            return web.json_response({'error': 'User ID required'}, status=400)
+            
+        # Extract fields to update
+        updates = {}
+        for key in ['theme', 'accent_color', 'settings_json', 'bio', 'display_name', 'username', 'avatar_url']:
+            if key in data:
+                updates[key] = data[key]
+                
+        if updates:
+            await db.update_user_profile(user_id, updates)
+            
+        db_user = await db.get_user_profile(user_id)
+        return web.json_response({'user': db_user})
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
 # ─── Web Application Setup & Middleware ─────────────────────────────────────────
 @web.middleware
 async def ngrok_skip_warning_middleware(request, handler):
@@ -381,6 +424,7 @@ def setup_web_app(app):
     app.router.add_get('/api/video', api_video_handler)
     app.router.add_post('/api/room/create', api_create_room_handler)
     app.router.add_post('/api/auth', api_auth_handler)
+    app.router.add_post('/api/profile/update', api_update_profile_handler)
     app.router.add_get('/ws/room/{room_code}', websocket_room_handler)
 
     web_app_dir = os.path.join(os.path.dirname(__file__), 'web')

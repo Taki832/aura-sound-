@@ -18,10 +18,10 @@ async def init_db():
                 language TEXT,
                 joined_date INTEGER,
                 listening_time INTEGER DEFAULT 0,
-                rooms_created INTEGER DEFAULT 0,
                 rooms_joined INTEGER DEFAULT 0,
                 theme TEXT DEFAULT 'dark',
-                accent_color TEXT DEFAULT '#1DB954'
+                accent_color TEXT DEFAULT '#1DB954',
+                settings_json TEXT DEFAULT '{}'
             )
         ''')
         
@@ -58,7 +58,35 @@ async def init_db():
             )
         ''')
 
+        # Chat Messages
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                room_code TEXT,
+                user_id INTEGER,
+                username TEXT,
+                text TEXT,
+                timestamp INTEGER
+            )
+        ''')
+
         await db.commit()
+
+async def save_chat_message(room_code, user_id, username, text):
+    now = int(time.time())
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('''
+            INSERT INTO messages (room_code, user_id, username, text, timestamp)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (room_code, user_id, username, text, now))
+        await db.commit()
+    return {'room_code': room_code, 'user_id': user_id, 'username': username, 'text': text, 'timestamp': now}
+
+async def get_room_messages(room_code, limit=50):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT * FROM messages WHERE room_code = ? ORDER BY timestamp DESC LIMIT ?', (room_code, limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(zip([col[0] for col in cursor.description], row)) for row in reversed(rows)]
 
 async def get_or_create_user(user_id, username, display_name, avatar_url=""):
     async with aiosqlite.connect(DB_PATH) as db:

@@ -36,29 +36,17 @@
                     <button class="pill" data-source="jiosaavn">JioSaavn</button>
                 </div>
 
-                <div class="section-title">Trending Now</div>
+                <div class="section-title">Play What You Love</div>
                 <div class="grid-2-col" id="trendingGrid">
-                    <div class="recent-card" data-query="Pavalamalli Sai Abhyankkar">
-                        <img src="https://images.unsplash.com/photo-1493225457124-a1a2a5f52210?w=100" alt="Music">
-                        <span>Pavalamalli</span>
-                    </div>
-                    <div class="recent-card" data-query="Katchi Sera Sai Abhyankkar">
-                        <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100" alt="Music">
-                        <span>Katchi Sera</span>
-                    </div>
-                    <div class="recent-card" data-query="Illuminati Aavesham">
-                        <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100" alt="Music">
-                        <span>Illuminati</span>
-                    </div>
-                    <div class="recent-card" data-query="Ta Takkara Kalki 2898">
-                        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100" alt="Music">
-                        <span>Ta Takkara</span>
+                    <!-- Populated dynamically by backend history/trends -->
+                    <div class="empty-search" style="grid-column: span 2;">
+                        <p class="text-muted" style="font-size: 14px;">Listen to songs, and your history will appear here.</p>
                     </div>
                 </div>
 
-                <div class="section-title">Quick Picks</div>
-                <div class="horizontal-scroll" id="quickPicksScroll">
-                    <!-- Populated by JS -->
+                <div class="section-title hidden" id="quickPicksTitle">Quick Picks</div>
+                <div class="horizontal-scroll hidden" id="quickPicksScroll">
+                    <!-- Populated dynamically by JS -->
                 </div>
             </section>
 
@@ -126,6 +114,18 @@
                             </ul>
                         </div>
 
+                        <!-- Room Chat UI -->
+                        <div class="room-chat-container">
+                            <h4>Room Chat</h4>
+                            <div class="chat-messages" id="chatMessages">
+                                <!-- Messages injected here -->
+                            </div>
+                            <div class="chat-input-row">
+                                <input type="text" id="chatInput" class="spotify-input" placeholder="Type a message..." autocomplete="off">
+                                <button id="btnSendChat" class="btn-spotify-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+
                         <button id="btnLeaveRoom" class="btn-danger-outline"><i class="fa-solid fa-right-from-bracket"></i> Leave Room</button>
                     </div>
 
@@ -160,26 +160,22 @@
                     <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" alt="Avatar" class="profile-avatar" id="profileAvatar">
                     <h3 id="profileDisplayName">User</h3>
                     <p class="text-muted" id="profileUsername">@username</p>
-                    <p class="profile-bio">Music enthusiast & Room Host 🎵</p>
+                    <p class="profile-bio" id="profileBio">No bio added.</p>
                     <div class="profile-stats">
-                        <div class="stat"><span class="val">12</span><span class="lbl">Friends</span></div>
-                        <div class="stat"><span class="val">1.2k</span><span class="lbl">Followers</span></div>
-                        <div class="stat"><span class="val">48</span><span class="lbl">Rooms</span></div>
+                        <div class="stat"><span class="val" id="profileFriendsCount">0</span><span class="lbl">Friends</span></div>
+                        <div class="stat"><span class="val" id="profileFollowersCount">0</span><span class="lbl">Followers</span></div>
+                        <div class="stat"><span class="val" id="profileRoomsCount">0</span><span class="lbl">Rooms</span></div>
                     </div>
                 </div>
                 
                 <div class="section-title">Achievements</div>
-                <div class="achievements-scroll">
-                    <div class="badge-card"><i class="fa-solid fa-fire" style="color: #ff9800;"></i> 7 Day Streak</div>
-                    <div class="badge-card"><i class="fa-solid fa-crown" style="color: #ffd700;"></i> Top Host</div>
-                    <div class="badge-card"><i class="fa-solid fa-seedling" style="color: #4caf50;"></i> Early Supporter</div>
+                <div class="achievements-scroll" id="profileAchievements">
+                    <div class="text-muted" style="font-size: 14px; padding: 0 16px;">Play more to earn achievements.</div>
                 </div>
 
                 <div class="section-title">Favorite Genres</div>
-                <div class="filter-pills">
-                    <button class="pill">Tamil Indie</button>
-                    <button class="pill">LoFi</button>
-                    <button class="pill">Synthwave</button>
+                <div class="filter-pills" id="profileGenres">
+                    <div class="text-muted" style="font-size: 14px; padding: 0 16px;">No genres selected.</div>
                 </div>
             </section>
 
@@ -189,27 +185,9 @@
                     <h2>Notifications</h2>
                     <i class="fa-solid fa-check-double text-muted"></i>
                 </header>
-                <div class="notifications-list">
-                    <div class="notification-item unread">
-                        <i class="fa-solid fa-user-plus icon-blue"></i>
-                        <div class="noti-text">
-                            <p><strong>Rahul</strong> accepted your friend request.</p>
-                            <span class="time">2m ago</span>
-                        </div>
-                    </div>
-                    <div class="notification-item unread">
-                        <i class="fa-solid fa-satellite-dish icon-green"></i>
-                        <div class="noti-text">
-                            <p><strong>Sai</strong> started an Audio Room.</p>
-                            <span class="time">10m ago</span>
-                        </div>
-                    </div>
-                    <div class="notification-item">
-                        <i class="fa-solid fa-music icon-purple"></i>
-                        <div class="noti-text">
-                            <p>New song added to <strong>LoFi Chill</strong> queue.</p>
-                            <span class="time">1h ago</span>
-                        </div>
+                <div class="notifications-list" id="notificationsList">
+                    <div class="empty-search">
+                        <p class="text-muted" style="font-size: 14px;">You have no new notifications.</p>
                     </div>
                 </div>
             </section>
@@ -236,11 +214,11 @@
                     <div class="settings-group-title">Appearance</div>
                     <div class="setting-item">
                         <span>Dynamic Glass Effects</span>
-                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                        <label class="switch"><input type="checkbox" id="settingGlassEffects" checked><span class="slider round"></span></label>
                     </div>
                     <div class="setting-item">
                         <span>AMOLED Dark Mode</span>
-                        <label class="switch"><input type="checkbox"><span class="slider round"></span></label>
+                        <label class="switch"><input type="checkbox" id="settingAmoled"><span class="slider round"></span></label>
                     </div>
                 </div>
 
@@ -248,11 +226,11 @@
                     <div class="settings-group-title">Music</div>
                     <div class="setting-item">
                         <span>High Quality Audio</span>
-                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                        <label class="switch"><input type="checkbox" id="settingHqAudio" checked><span class="slider round"></span></label>
                     </div>
                     <div class="setting-item">
                         <span>Gapless Playback</span>
-                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                        <label class="switch"><input type="checkbox" id="settingGapless" checked><span class="slider round"></span></label>
                     </div>
                 </div>
                 
