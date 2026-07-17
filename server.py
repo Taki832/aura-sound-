@@ -68,7 +68,9 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
         'noplaylist': True,
         'quiet': True,
         'no_warnings': True,
-        'default_search': 'ytsearch'
+        'default_search': 'ytsearch',
+        'extract_flat': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
     }
     
     search_query = query
@@ -99,7 +101,13 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
     return results
 
 def get_direct_stream_url(query: str):
-    opts = {'format': 'bestaudio/best', 'noplaylist': True, 'quiet': True, 'no_warnings': True}
+    opts = {
+        'format': 'bestaudio/best', 
+        'noplaylist': True, 
+        'quiet': True, 
+        'no_warnings': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+    }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
             info = ydl.extract_info(f"ytsearch:{query}", download=False)
@@ -112,7 +120,13 @@ def get_direct_stream_url(query: str):
 
 def get_youtube_video_metadata(query: str):
     """Resolve a search query to a YouTube video ID for the official embed player."""
-    opts = {'noplaylist': True, 'quiet': True, 'no_warnings': True}
+    opts = {
+        'noplaylist': True, 
+        'quiet': True, 
+        'no_warnings': True,
+        'extract_flat': True,
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+    }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
             info = ydl.extract_info(f"ytsearch:{query}", download=False)
