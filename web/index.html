@@ -3,270 +3,245 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AuraSound AI — Vishnu's Music & Video Sync Hub</title>
-    <!-- Google Fonts -->
+    <title>AuraSound AI — Spotify Clone</title>
+    <!-- Spotify-like font (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Telegram WebApp SDK -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="app-shell">
-        <!-- ─── DESKTOP SIDEBAR (PC > 900px) ─── -->
-        <aside class="pc-sidebar">
-            <div class="brand-header">
-                <div class="brand-icon"><i class="fa-solid fa-compact-disc fa-spin-pulse" style="--fa-animation-duration: 6s;"></i></div>
-                <div class="brand-title">
-                    <h2>Aura<span>Sound</span></h2>
-                    <span class="brand-sub">MUSIC & VIDEO SYNC AI</span>
-                </div>
-            </div>
-
-            <div class="user-card">
-                <div class="u-avatar">V</div>
-                <div class="u-details">
-                    <h4>Vishnu</h4>
-                    <span class="vip-badge"><i class="fa-solid fa-crown"></i> PRO Listener</span>
-                </div>
-            </div>
-
-            <nav class="pc-nav">
-                <button class="pc-nav-btn active" data-view="discover">
-                    <i class="fa-solid fa-compass"></i> Discover & Search
-                </button>
-                <button class="pc-nav-btn" data-view="video">
-                    <i class="fa-solid fa-clapperboard text-pink"></i> Video Songs
-                </button>
-                <button class="pc-nav-btn" data-view="room">
-                    <i class="fa-solid fa-users-rays"></i> Sync Room
-                    <span class="status-pill" id="pcRoomBadge">OFFLINE</span>
-                </button>
-                <button class="pc-nav-btn" data-view="favorites">
-                    <i class="fa-solid fa-heart"></i> Favorites
-                    <span class="count-pill" id="pcFavCount">0</span>
-                </button>
-                <button class="pc-nav-btn" data-view="queue">
-                    <i class="fa-solid fa-layer-group"></i> Queue
-                </button>
-            </nav>
-
-            <div class="sidebar-visualizer">
-                <div class="vis-label"><i class="fa-solid fa-waveform"></i> Audio Engine Pulse</div>
-                <canvas id="pcCanvas" width="220" height="50"></canvas>
-            </div>
-        </aside>
-
-        <!-- ─── MAIN CONTENT CONTAINER ─── -->
-        <main class="main-body">
-            <!-- Mobile Top App Bar -->
-            <header class="mobile-top-bar">
-                <div class="mobile-logo">
-                    <div class="mini-logo"><i class="fa-solid fa-compact-disc text-cyan"></i></div>
-                    <h3>Aura<span>Sound</span></h3>
-                </div>
-                <div class="mobile-top-actions">
-                    <button class="mode-toggle-btn" id="modeToggleBtn" title="Toggle Audio/Video Mode">
-                        <i class="fa-solid fa-headphones text-cyan" id="modeIcon"></i>
-                        <span id="modeLabel">Audio</span>
-                    </button>
-                    <button class="room-indicator-btn" id="mobileRoomPill">
-                        <i class="fa-solid fa-satellite-dish"></i>
-                        <span id="mobileRoomStatusText">Solo</span>
-                    </button>
-                    <div class="user-avatar-mini">V</div>
-                </div>
-            </header>
-
-            <!-- Active Room Live Banner -->
-            <div class="live-room-banner hidden" id="liveRoomBanner">
-                <div class="banner-left">
-                    <span class="live-tag"><i class="fa-solid fa-circle fa-beat text-green"></i> ROOM SYNCED</span>
-                    <strong id="bannerCode">VISHNU-808</strong>
-                    <span class="sync-accuracy-tag" id="accuracyTag">⚡ 1s server pulse</span>
-                </div>
-                <div class="banner-right">
-                    <button id="copyCodeBtn" title="Copy Room Link"><i class="fa-solid fa-copy"></i></button>
-                    <button id="leaveRoomBtn" title="Leave Room"><i class="fa-solid fa-right-from-bracket text-pink"></i></button>
-                </div>
-            </div>
-
-            <!-- Search & Source Selector Section -->
-            <section class="search-block">
-                <div class="search-input-wrapper">
-                    <i class="fa-solid fa-magnifying-glass search-ic"></i>
-                    <input type="text" id="searchInput" placeholder="Search song, video, artist..." autocomplete="off">
-                    <button id="searchBtn" class="search-submit-btn">Search</button>
+    <div class="app-container">
+        
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content" id="mainContent">
+            
+            <!-- HOME VIEW -->
+            <section id="view-home" class="view-section active">
+                <header class="top-header">
+                    <h2 id="greetingText">Good afternoon</h2>
+                    <div class="header-icons">
+                        <i class="fa-regular fa-bell"></i>
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <i class="fa-solid fa-gear"></i>
+                    </div>
+                </header>
+                
+                <div class="filter-pills" id="homeSourcePills">
+                    <button class="pill active" data-source="all">All</button>
+                    <button class="pill" data-source="spotify">Spotify</button>
+                    <button class="pill" data-source="youtube">YouTube</button>
+                    <button class="pill" data-source="jiosaavn">JioSaavn</button>
                 </div>
 
-                <!-- Source Selector Tabs -->
-                <div class="source-scroll-pills" id="sourcePills">
-                    <button class="src-pill active" data-source="all">🌐 All</button>
-                    <button class="src-pill" data-source="spotify">🟢 Spotify</button>
-                    <button class="src-pill" data-source="youtube">🔴 YouTube Videos</button>
-                    <button class="src-pill" data-source="jiosaavn">🟣 JioSaavn</button>
+                <div class="section-title">Trending Now</div>
+                <div class="grid-2-col" id="trendingGrid">
+                    <div class="recent-card" data-query="Pavalamalli Sai Abhyankkar">
+                        <img src="https://images.unsplash.com/photo-1493225457124-a1a2a5f52210?w=100" alt="Music">
+                        <span>Pavalamalli</span>
+                    </div>
+                    <div class="recent-card" data-query="Katchi Sera Sai Abhyankkar">
+                        <img src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=100" alt="Music">
+                        <span>Katchi Sera</span>
+                    </div>
+                    <div class="recent-card" data-query="Illuminati Aavesham">
+                        <img src="https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=100" alt="Music">
+                        <span>Illuminati</span>
+                    </div>
+                    <div class="recent-card" data-query="Ta Takkara Kalki 2898">
+                        <img src="https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=100" alt="Music">
+                        <span>Ta Takkara</span>
+                    </div>
                 </div>
 
-                <!-- Quick Trending Chips -->
-                <div class="trending-chips">
-                    <button class="t-chip active" data-query="Pavalamalli Sai Abhyankkar Video Song">🎬 Pavalamalli Video</button>
-                    <button class="t-chip" data-query="Katchi Sera Sai Abhyankkar Video Song">🟢 Katchi Sera Video</button>
-                    <button class="t-chip" data-query="Illuminati Aavesham Official Video">🔴 Illuminati Video</button>
-                    <button class="t-chip" data-query="Ta Takkara Kalki 2898 AD Video">🟣 Ta Takkara Video</button>
+                <div class="section-title">Quick Picks</div>
+                <div class="horizontal-scroll" id="quickPicksScroll">
+                    <!-- Populated by JS -->
                 </div>
             </section>
 
-            <!-- YouTube's supported iframe player is created here when a video is selected. -->
-            <div class="video-player-section hidden" id="videoPlayerSection">
-                <div class="video-wrapper">
-                    <div id="youtubePlayer" class="youtube-player-host" aria-label="YouTube video player"></div>
-                    <button class="close-video-btn" id="closeVideoBtn" title="Switch back to Audio Mode">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
+            <!-- SEARCH VIEW -->
+            <section id="view-search" class="view-section">
+                <div class="search-header">
+                    <h2>Search</h2>
+                    <div class="search-bar-wrapper">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" id="searchInput" placeholder="What do you want to listen to?" autocomplete="off">
+                        <button id="clearSearchBtn" class="hidden"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
                 </div>
-                <div class="video-details-bar">
-                    <h4 id="videoTitle">YouTube Video Song</h4>
-                    <span class="badge-live-video">🎬 HD VIDEO SYNCED</span>
-                </div>
-            </div>
-
-            <!-- VIEW PANES -->
-            <!-- 1. Discover View -->
-            <div id="discoverView" class="view-pane active">
-                <div class="pane-header">
-                    <h4>Top Search Results</h4>
-                    <span id="resultsCount" class="results-meta">6 tracks</span>
-                </div>
-                <div id="resultsGrid" class="track-cards-grid">
-                    <div class="loading-state hidden" id="loadingState">
+                
+                <div id="searchResultsArea" class="search-results-area">
+                    <div class="loading-spinner hidden" id="searchSpinner">
                         <div class="spinner"></div>
-                        <p>Fetching audio & video streams...</p>
                     </div>
-                    <div class="empty-state" id="emptyState">
-                        <i class="fa-solid fa-film text-pink"></i>
-                        <p>Search for songs or video songs above to play!</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 2. Video Songs Dedicated View -->
-            <div id="videoView" class="view-pane hidden">
-                <div class="pane-header">
-                    <h4>🎬 Trending YouTube Video Songs</h4>
-                </div>
-                <div id="videoGrid" class="track-cards-grid">
-                    <!-- Loaded dynamically -->
-                </div>
-            </div>
-
-            <!-- 3. Room View -->
-            <div id="roomView" class="view-pane hidden">
-                <div class="room-card-box">
-                    <div class="room-hero-ic"><i class="fa-solid fa-users-rays"></i></div>
-                    <h3>Audio & Video Sync Room</h3>
-                    <p>Listen to audio or watch YouTube video songs synchronized live with friends!</p>
-
-                    <div class="room-action-grid">
-                        <div class="r-box">
-                            <h5>Create Room</h5>
-                            <input type="text" id="createRoomName" value="Vishnu's Sync Lounge" placeholder="Room Name">
-                            <button id="createRoomBtn" class="btn-cyan-glow"><i class="fa-solid fa-plus"></i> Create Room</button>
-                        </div>
-                        <div class="r-box">
-                            <h5>Join Room</h5>
-                            <input type="text" id="joinRoomCode" placeholder="Enter Room Code">
-                            <button id="joinRoomBtn" class="btn-purple-glow"><i class="fa-solid fa-right-to-bracket"></i> Join Room</button>
+                    <div id="resultsList" class="track-list">
+                        <div class="empty-search">
+                            <h4>Play what you love</h4>
+                            <p>Search for artists, songs, podcasts, and more.</p>
                         </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <!-- 4. Favorites View -->
-            <div id="favoritesView" class="view-pane hidden">
-                <div class="pane-header">
-                    <h4>❤️ Vishnu's Favorites</h4>
-                </div>
-                <div id="favoritesGrid" class="track-cards-grid">
-                    <div class="empty-state"><p>No favorite tracks saved yet!</p></div>
-                </div>
-            </div>
+            <!-- SYNC ROOM VIEW -->
+            <section id="view-room" class="view-section">
+                <header class="top-header">
+                    <h2>Sync Room</h2>
+                </header>
+                <div class="room-container">
+                    
+                    <!-- Pre-Room State -->
+                    <div id="roomSetupState">
+                        <p class="room-desc">Listen to audio or watch videos perfectly synchronized with your friends!</p>
+                        
+                        <div class="card-box create-box">
+                            <h3>Create a Room</h3>
+                            <input type="text" id="roomNameInput" placeholder="My Awesome Room" class="spotify-input">
+                            <div class="btn-row">
+                                <button id="btnCreateAudioRoom" class="btn-spotify-primary"><i class="fa-solid fa-headphones"></i> Audio Room</button>
+                                <button id="btnCreateVideoRoom" class="btn-spotify-secondary"><i class="fa-solid fa-film"></i> Video Room</button>
+                            </div>
+                        </div>
 
-            <!-- 5. Queue View -->
-            <div id="queueView" class="view-pane hidden">
-                <div class="pane-header">
-                    <h4>Queue & Up Next</h4>
-                    <button id="clearQueueBtn" class="btn-text-danger">Clear</button>
+                        <div class="card-box join-box">
+                            <h3>Join a Room</h3>
+                            <input type="text" id="joinCodeInput" placeholder="Enter Room Code" class="spotify-input" style="text-transform: uppercase;">
+                            <button id="btnJoinRoom" class="btn-spotify-outline"><i class="fa-solid fa-right-to-bracket"></i> Join Room</button>
+                        </div>
+                    </div>
+
+                    <!-- Active Room State -->
+                    <div id="roomActiveState" class="hidden">
+                        <div class="live-badge"><div class="dot-pulse"></div> LIVE SYNC</div>
+                        <h3 id="activeRoomName">Vishnu's Room</h3>
+                        <p class="room-code-display">Code: <strong id="activeRoomCode">XXXXXX</strong> <i class="fa-regular fa-copy" id="copyCodeIcon"></i></p>
+                        
+                        <div class="room-members-list">
+                            <h4>Members (<span id="memberCount">1</span>)</h4>
+                            <ul id="membersUl">
+                                <li>Vishnu (Host)</li>
+                            </ul>
+                        </div>
+
+                        <button id="btnLeaveRoom" class="btn-danger-outline"><i class="fa-solid fa-right-from-bracket"></i> Leave Room</button>
+                    </div>
+
                 </div>
-                <div id="queueGrid" class="track-cards-grid">
-                    <div class="empty-state"><p>Queue is empty!</p></div>
+            </section>
+
+            <!-- LIBRARY VIEW -->
+            <section id="view-library" class="view-section">
+                <header class="top-header">
+                    <h2>Your Library</h2>
+                    <div class="header-icons">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <i class="fa-solid fa-plus"></i>
+                    </div>
+                </header>
+                <div class="library-list" id="libraryList">
+                    <div class="library-item liked-songs-item">
+                        <div class="liked-icon"><i class="fa-solid fa-heart"></i></div>
+                        <div class="lib-info">
+                            <h4>Liked Songs</h4>
+                            <p><span id="likedCount">0</span> songs</p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </section>
+
         </main>
-    </div>
 
-    <!-- ─── SLEEK PLAYER FOOTER BAR ─── -->
-    <div class="player-floating-bar" id="playerBar">
-        <audio id="inAppAudio" preload="auto"></audio>
-
-        <div class="player-left-info">
-            <div class="album-art" id="playerArt">
-                <i class="fa-solid fa-music"></i>
-            </div>
-            <div class="track-titles">
-                <h4 id="playerTitle">Select a track or video to play</h4>
-                <p id="playerArtist">Vishnu's AuraSound Player</p>
-            </div>
-            <button class="fav-icon-btn" id="playerFavBtn"><i class="fa-regular fa-heart"></i></button>
-        </div>
-
-        <div class="player-center-controls">
-            <div class="control-btns">
-                <button id="prevBtn" class="sub-btn"><i class="fa-solid fa-backward-step"></i></button>
-                <button id="playPauseBtn" class="main-play-btn"><i class="fa-solid fa-play"></i></button>
-                <button id="nextBtn" class="sub-btn"><i class="fa-solid fa-forward-step"></i></button>
-            </div>
-            <div class="scrubber-row">
-                <span id="currentTime">0:00</span>
-                <div class="scrubber-track" id="scrubberTrack">
-                    <div class="scrubber-fill" id="scrubberFill"></div>
+        <!-- FLOATING MINI PLAYER (Bottom) -->
+        <div class="mini-player hidden" id="miniPlayer">
+            <div class="mini-player-content">
+                <img src="" alt="Album Art" class="mini-art" id="miniArt">
+                <div class="mini-info">
+                    <h4 class="marquee"><span id="miniTitle">Title</span></h4>
+                    <p id="miniArtist">Artist</p>
                 </div>
-                <span id="totalDuration">0:00</span>
+                <div class="mini-controls">
+                    <i class="fa-regular fa-heart" id="miniFavBtn"></i>
+                    <i class="fa-solid fa-play" id="miniPlayBtn"></i>
+                </div>
+            </div>
+            <div class="mini-progress-bar">
+                <div class="mini-progress-fill" id="miniProgressFill"></div>
             </div>
         </div>
 
-        <div class="player-right-controls">
-            <div class="eq-bars" id="eqBars">
-                <span></span><span></span><span></span><span></span>
+        <!-- BOTTOM NAV BAR -->
+        <nav class="bottom-nav">
+            <a href="#" class="nav-item active" data-target="view-home">
+                <i class="fa-solid fa-house"></i>
+                <span>Home</span>
+            </a>
+            <a href="#" class="nav-item" data-target="view-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <span>Search</span>
+            </a>
+            <a href="#" class="nav-item" data-target="view-room">
+                <i class="fa-solid fa-users-rays"></i>
+                <span>Sync Room</span>
+            </a>
+            <a href="#" class="nav-item" data-target="view-library">
+                <i class="fa-solid fa-book-open"></i>
+                <span>Your Library</span>
+            </a>
+        </nav>
+
+        <!-- FULL SCREEN PLAYER OVERLAY -->
+        <div class="full-player-overlay" id="fullPlayerOverlay">
+            <div class="full-player-header">
+                <i class="fa-solid fa-chevron-down" id="closeFullPlayerBtn"></i>
+                <span class="now-playing-text" id="fullPlayerModeText">PLAYING FROM SEARCH</span>
+                <i class="fa-solid fa-ellipsis"></i>
             </div>
-            <div class="vol-control">
-                <i class="fa-solid fa-volume-high text-muted"></i>
-                <input type="range" id="volumeSlider" min="0" max="100" value="80" class="v-range">
+            
+            <!-- This container holds EITHER the Album Art OR the YouTube Video iFrame -->
+            <div class="full-player-art-container">
+                <img src="" alt="Album Art" class="full-art" id="fullArt">
+                <div id="youtubePlayerHost" class="hidden"></div>
+            </div>
+
+            <div class="full-player-info">
+                <div class="title-artist">
+                    <h2 id="fullTitle" class="marquee"><span>Song Title</span></h2>
+                    <p id="fullArtist">Artist Name</p>
+                </div>
+                <i class="fa-regular fa-heart fa-xl" id="fullFavBtn"></i>
+            </div>
+
+            <div class="full-player-scrubber">
+                <input type="range" id="seekSlider" class="seek-slider" min="0" max="100" value="0">
+                <div class="time-row">
+                    <span id="timeCurrent">0:00</span>
+                    <span id="timeTotal">0:00</span>
+                </div>
+            </div>
+
+            <div class="full-player-controls">
+                <i class="fa-solid fa-shuffle text-muted"></i>
+                <i class="fa-solid fa-backward-step fa-2x" id="fullPrevBtn"></i>
+                <div class="play-pause-circle" id="fullPlayBtn">
+                    <i class="fa-solid fa-play fa-xl" style="margin-left: 4px;"></i>
+                </div>
+                <i class="fa-solid fa-forward-step fa-2x" id="fullNextBtn"></i>
+                <i class="fa-solid fa-repeat text-muted"></i>
+            </div>
+
+            <div class="full-player-footer">
+                <i class="fa-solid fa-satellite-dish" id="fullRoomSyncIcon"></i>
+                <i class="fa-solid fa-share-nodes"></i>
             </div>
         </div>
+        
+        <!-- HIDDEN YOUTUBE PLAYER FOR AUDIO STREAMING -->
+        <div id="hiddenAudioPlayerHost" style="position: absolute; width: 1px; height: 1px; top: -9999px; left: -9999px; opacity: 0; pointer-events: none;"></div>
+
     </div>
-
-    <!-- MOBILE BOTTOM TAB BAR -->
-    <nav class="mobile-tab-bar">
-        <button class="tab-item active" data-view="discover">
-            <i class="fa-solid fa-compass"></i>
-            <span>Discover</span>
-        </button>
-        <button class="tab-item" data-view="room">
-            <i class="fa-solid fa-users-rays"></i>
-            <span>Sync Room</span>
-        </button>
-        <button class="tab-item" data-view="favorites">
-            <i class="fa-solid fa-heart"></i>
-            <span>Favorites</span>
-        </button>
-        <button class="tab-item" data-view="queue">
-            <i class="fa-solid fa-layer-group"></i>
-            <span>Queue</span>
-        </button>
-    </nav>
 
     <!-- Toast Banner -->
     <div id="toast" class="toast hidden"></div>
