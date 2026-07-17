@@ -85,23 +85,32 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
     elif source == 'youtube':
         search_query = f"{query} youtube music video"
 
+    # Exponential Backoff Retry Logic
     results = []
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    max_retries = 3
+    for attempt in range(max_retries):
         try:
-            info = ydl.extract_info(f"ytsearch{limit}:{search_query}", download=False)
-            if info and info.get('entries'):
-                for entry in info['entries']:
-                    src_tag = source if source != 'all' else ('spotify' if 'spotify' in entry.get('title','').lower() else 'youtube')
-                    results.append({
-                        'title': entry.get('title', 'Unknown Track'),
-                        'url': entry.get('url', ''),
-                        'thumbnail': entry.get('thumbnail', ''),
-                        'duration': entry.get('duration', 0),
-                        'id': entry.get('id', ''),
-                        'source': src_tag
-                    })
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(f"ytsearch{limit}:{search_query}", download=False)
+                if info and info.get('entries'):
+                    for entry in info['entries']:
+                        src_tag = source if source != 'all' else ('spotify' if 'spotify' in entry.get('title','').lower() else 'youtube')
+                        results.append({
+                            'title': entry.get('title', 'Unknown Track'),
+                            'url': entry.get('url', ''),
+                            'thumbnail': entry.get('thumbnail', ''),
+                            'duration': entry.get('duration', 0),
+                            'yt_id': entry.get('id', ''),
+                            'source': src_tag
+                        })
+            break # Success, break out of retry loop
         except Exception as e:
-            print(f"[Search Error] {e}")
+            print(f"[Search Attempt {attempt+1}/{max_retries} Failed] {e}")
+            if "429" in str(e) or "Too Many Requests" in str(e):
+                time.sleep(1.5 ** attempt) # Exponential backoff
+            else:
+                time.sleep(0.5)
+
     return results
 
 def get_direct_stream_url(query: str):
@@ -203,16 +212,29 @@ async def websocket_room_handler(request):
     await ws.prepare(request)
 
     if room_code not in sync_rooms:
-        sync_rooms[room_code] = {
-            'name': f"{user_name}'s Sync Room",
-            'sockets': [],
-            'members': [],
-            'current_track': None,
-            'is_playing': False,
-            'is_video': False,
-            'start_time': time.time(),
-            'pause_offset': 0
-        }
+        db_room = await db.load_room_state(room_code)
+        if db_room:
+            sync_rooms[room_code] = {
+                'name': db_room.get('name') or f"{user_name}'s Sync Room",
+                'sockets': [],
+                'members': [],
+                'current_track': db_room.get('current_track'),
+                'is_playing': db_room.get('is_playing', False),
+                'is_video': db_room.get('is_video', False),
+                'start_time': db_room.get('start_time', time.time()),
+                'pause_offset': db_room.get('pause_offset', 0)
+            }
+        else:
+            sync_rooms[room_code] = {
+                'name': f"{user_name}'s Sync Room",
+                'sockets': [],
+                'members': [],
+                'current_track': None,
+                'is_playing': False,
+                'is_video': False,
+                'start_time': time.time(),
+                'pause_offset': 0
+            }
 
     room = sync_rooms[room_code]
     room['sockets'].append(ws)
@@ -250,30 +272,31 @@ async def websocket_room_handler(request):
                     continue
                 action_type = data.get('type')
 
-                if action_type == 'ACTION_PLAY':
-                    track = data.get('track') or room['current_track']
-                    if not isinstance(track, dict):
-                        continue
-                    pos = coerce_position(data.get('position', 0), track.get('duration', 0))
-                    is_vid = data.get('is_video', False)
-                    room['current_track'] = track
+                if action_type == 'ACTION_TRACK':
+                    room['current_track'] = data.get('track')
+                    room['is_video'] = data.get('is_video', False)
+                    room['start_time'] = time.time()
+                    room['pause_offset'] = 0
                     room['is_playing'] = True
-                    room['is_video'] = is_vid
-                    room['pause_offset'] = pos
-                    room['start_time'] = time.time() - pos
-                    print(f"[Room #{room_code}] PLAY {'VIDEO' if is_vid else 'AUDIO'}: '{track.get('title')}' at {pos}s")
                     await broadcast_room_state(room_code, room)
+                    asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], True, room['is_video'], room['start_time'], 0))
+
+                elif action_type == 'ACTION_PLAY':
+                    pos = coerce_position(data.get('position', 0))
+                    room['is_playing'] = True
+                    room['start_time'] = time.time() - pos
+                    room['pause_offset'] = pos
+                    await broadcast_room_state(room_code, room)
+                    asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], True, room['is_video'], room['start_time'], pos))
 
                 elif action_type == 'ACTION_PAUSE':
-                    duration = (room['current_track'] or {}).get('duration', 0)
-                    pos = coerce_position(data.get('position', room_position(room)), duration)
+                    pos = coerce_position(data.get('position', 0))
                     room['is_playing'] = False
                     room['pause_offset'] = pos
-                    print(f"[Room #{room_code}] PAUSE at {pos}s")
                     await broadcast_room_state(room_code, room)
+                    asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], False, room['is_video'], room['start_time'], pos))
 
                 elif action_type == 'ACTION_SEEK':
-                    duration = (room['current_track'] or {}).get('duration', 0)
                     pos = coerce_position(data.get('position', 0), duration)
                     room['pause_offset'] = pos
                     if room['is_playing']:
@@ -310,16 +333,45 @@ async def websocket_room_handler(request):
     return ws
 
 # ─── REST API Handlers ──────────────────────────────────────────────────────────
+in_flight_searches = {}
+
 async def api_search_handler(request):
     query = request.query.get('q', '').strip()
     source = request.query.get('source', 'all').strip()
     if not query:
         return web.json_response({'results': []})
     
-    print(f"[HTTP API] Multi-Source Search: '{query}' ({source})")
+    cache_key = f"{source}:{query.lower()}"
+    
+    # 1. Check DB Cache
+    cached = await db.get_cached_search(cache_key)
+    if cached:
+        print(f"[Search Cache HIT] '{query}'")
+        return web.json_response({'results': cached, 'cached': True})
+
+    # 2. Request Deduplication (In-Flight Coalescing)
+    if cache_key in in_flight_searches:
+        print(f"[Search In-Flight Wait] '{query}'")
+        results = await in_flight_searches[cache_key]
+        return web.json_response({'results': results, 'cached': True})
+
+    # Create Future for in-flight requests
     loop = asyncio.get_running_loop()
-    tracks = await loop.run_in_executor(None, multi_source_search, query, source, 6)
-    return web.json_response({'results': tracks})
+    fut = loop.create_future()
+    in_flight_searches[cache_key] = fut
+
+    try:
+        print(f"[HTTP API] Multi-Source Search: '{query}' ({source})")
+        tracks = await loop.run_in_executor(None, multi_source_search, query, source, 6)
+        if tracks:
+            await db.set_cached_search(cache_key, tracks)
+        fut.set_result(tracks)
+        return web.json_response({'results': tracks, 'cached': False})
+    except Exception as e:
+        fut.set_result([])
+        return web.json_response({'results': [], 'error': 'Rate limited or search service unavailable'}, status=429)
+    finally:
+        in_flight_searches.pop(cache_key, None)
 
 async def api_stream_handler(request):
     query = request.query.get('q', '').strip()

@@ -507,32 +507,47 @@ async function initRoom(asHost, asVideoRoom, code = "") {
     roomCode = code;
     isRoomHost = asHost;
     
-    // Connect WS
-    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${wsProto}//${location.host}/ws/room/${code}?user=${encodeURIComponent(user)}`);
-    
-    ws.onopen = () => {
-        document.getElementById('roomSetupState').classList.add('hidden');
-        document.getElementById('roomActiveState').classList.remove('hidden');
-        document.getElementById('activeRoomCode').textContent = code;
-        document.getElementById('fullRoomSyncIcon').style.color = '#1DB954';
-        showToast(asHost ? "Room Created!" : "Joined Room!");
-    };
-    
-    ws.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        if (data.type === 'INIT_ROOM_STATE' || data.type === 'SERVER_STATE' || data.type === 'SERVER_HEARTBEAT') {
-            handleServerState(data);
-            if (data.type === 'INIT_ROOM_STATE' && data.recent_messages) {
-                document.getElementById('chatMessages').innerHTML = '';
-                data.recent_messages.forEach(appendChatMessage);
+    let reconnectAttempts = 0;
+    const connectWS = () => {
+        const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${wsProto}//${location.host}/ws/room/${code}?user=${encodeURIComponent(user)}`);
+        
+        ws.onopen = () => {
+            reconnectAttempts = 0;
+            document.getElementById('roomSetupState').classList.add('hidden');
+            document.getElementById('roomActiveState').classList.remove('hidden');
+            document.getElementById('activeRoomCode').textContent = code;
+            document.getElementById('fullRoomSyncIcon').style.color = '#1DB954';
+            showToast(asHost ? "Room Created!" : "Connected to Room!");
+        };
+        
+        ws.onmessage = (msg) => {
+            const data = JSON.parse(msg.data);
+            if (data.type === 'INIT_ROOM_STATE' || data.type === 'SERVER_STATE' || data.type === 'SERVER_HEARTBEAT') {
+                handleServerState(data);
+                if (data.type === 'INIT_ROOM_STATE' && data.recent_messages) {
+                    document.getElementById('chatMessages').innerHTML = '';
+                    data.recent_messages.forEach(appendChatMessage);
+                }
+            } else if (data.type === 'CHAT_MESSAGE') {
+                appendChatMessage(data.message);
             }
-        } else if (data.type === 'CHAT_MESSAGE') {
-            appendChatMessage(data.message);
-        }
+        };
+        
+        ws.onclose = () => {
+            document.getElementById('fullRoomSyncIcon').style.color = '#e91e63';
+            if (reconnectAttempts < 5 && roomCode === code) {
+                reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
+                showToast(`Reconnecting (${reconnectAttempts}/5)...`);
+                setTimeout(connectWS, delay);
+            } else {
+                showToast("Disconnected from room");
+            }
+        };
     };
-    
-    ws.onclose = () => { showToast("Disconnected from room"); };
+
+    connectWS();
 }
 
 function handleServerState(state) {

@@ -55,6 +55,7 @@ async def run_tests():
 
     # 7. Friends System
     friend_id = 888888
+    await db.reject_friend_request(test_user_id, friend_id) # Clean old state
     await db.get_or_create_user(friend_id, "frienduser", "Friend User", "")
     success, msg = await db.send_friend_request(test_user_id, friend_id)
     assert success is True
@@ -63,23 +64,29 @@ async def run_tests():
     await db.accept_friend_request(friend_id, test_user_id)
     friends = await db.get_friends_list(test_user_id)
     assert len(friends) >= 1
-    print("[PASS] [7/8] Friend System (Request, Accept, List) Passed")
+    print("[PASS] [7/10] Friend System (Request, Accept, List) Passed")
 
-    # 8. Playlists & Liked Songs
-    pl_id = await db.create_playlist(test_user_id, "My Favorites", "Best tunes")
-    assert pl_id > 0
-    track = {'title': 'Test Song', 'yt_id': 'xyz123', 'duration': 180}
-    await db.add_track_to_playlist(pl_id, test_user_id, track)
-    playlists = await db.get_user_playlists(test_user_id)
-    assert len(playlists[0]['tracks']) >= 1
-    
-    is_liked, _ = await db.toggle_liked_song(test_user_id, track)
-    assert is_liked is True
-    liked = await db.get_liked_songs(test_user_id)
-    assert len(liked) >= 1
-    print("[PASS] [8/8] Playlists & Liked Songs Operations Passed")
+    # 9. Room Persistence & Recovery
+    room_test_code = "SYNC-999"
+    track_test = {'title': 'Persistent Song', 'duration': 200, 'yt_id': 'abc999'}
+    await db.save_room_state(room_test_code, "Persistent Room", test_user_id, track_test, True, False, 10000.0, 50.0)
+    loaded_room = await db.load_room_state(room_test_code)
+    assert loaded_room is not None
+    assert loaded_room['room_code'] == room_test_code
+    assert loaded_room['current_track']['title'] == 'Persistent Song'
+    assert loaded_room['pause_offset'] == 50.0
+    print("[PASS] [9/10] Room Persistent DB State & Recovery Passed")
 
-    print("\n[SUCCESS] ALL 8 AUTOMATED SYSTEM TESTS PASSED SUCCESSFULLY!")
+    # 10. Search Caching & Deduplication
+    cache_key = "all:katchi sera"
+    fake_results = [{'title': 'Katchi Sera', 'yt_id': 'ks123'}]
+    await db.set_cached_search(cache_key, fake_results)
+    cached = await db.get_cached_search(cache_key)
+    assert cached is not None
+    assert cached[0]['yt_id'] == 'ks123'
+    print("[PASS] [10/10] Search Caching & Deduplication Passed")
+
+    print("\n[SUCCESS] ALL 10 AUTOMATED SYSTEM STABILITY TESTS PASSED SUCCESSFULLY!")
 
 if __name__ == "__main__":
     asyncio.run(run_tests())

@@ -71,31 +71,85 @@ async def init_db():
             )
         ''')
 
-        # Notifications Table
+        # Rooms Table (Persistent Room State)
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS notifications (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                type TEXT, -- 'friend_request', 'room_invite', 'system', 'playlist'
-                title TEXT,
-                message TEXT,
-                data_json TEXT,
-                is_read INTEGER DEFAULT 0,
-                created_at INTEGER
+            CREATE TABLE IF NOT EXISTS rooms (
+                room_code TEXT PRIMARY KEY,
+                name TEXT,
+                host_id INTEGER,
+                current_track_json TEXT,
+                is_playing INTEGER DEFAULT 0,
+                is_video INTEGER DEFAULT 0,
+                start_time REAL DEFAULT 0,
+                pause_offset REAL DEFAULT 0,
+                updated_at INTEGER
             )
         ''')
 
-        # Liked Songs Table
+        # Search Cache Table (Deduplication & Rate Limit Prevention)
         await db.execute('''
-            CREATE TABLE IF NOT EXISTS liked_songs (
-                user_id INTEGER,
-                track_id TEXT,
-                track_json TEXT,
-                liked_at INTEGER,
-                PRIMARY KEY (user_id, track_id)
+            CREATE TABLE IF NOT EXISTS search_cache (
+                query_key TEXT PRIMARY KEY,
+                results_json TEXT,
+                cached_at INTEGER
             )
         ''')
 
+        await db.commit()
+
+# --- ROOM PERSISTENCE FUNCTIONS ---
+async def save_room_state(room_code, name, host_id, track_data, is_playing, is_video, start_time, pause_offset):
+    now = int(time.time())
+    track_json = json.dumps(track_data) if track_data else None
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('''
+            INSERT INTO rooms (room_code, name, host_id, current_track_json, is_playing, is_video, start_time, pause_offset, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(room_code) DO UPDATE SET
+                name=excluded.name,
+                host_id=excluded.host_id,
+                current_track_json=excluded.current_track_json,
+                is_playing=excluded.is_playing,
+                is_video=excluded.is_video,
+                start_time=excluded.start_time,
+                pause_offset=excluded.pause_offset,
+                updated_at=excluded.updated_at
+        ''', (room_code, name, host_id, track_json, 1 if is_playing else 0, 1 if is_video else 0, start_time, pause_offset, now))
+        await db.commit()
+
+async def load_room_state(room_code):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT * FROM rooms WHERE room_code = ?', (room_code,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                d = dict(zip([col[0] for col in cursor.description], row))
+                d['current_track'] = json.loads(d['current_track_json']) if d.get('current_track_json') else None
+                d['is_playing'] = bool(d['is_playing'])
+                d['is_video'] = bool(d['is_video'])
+                return d
+    return None
+
+# --- SEARCH CACHE FUNCTIONS ---
+async def get_cached_search(query_key, max_age_seconds=86400):
+    now = int(time.time())
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT results_json, cached_at FROM search_cache WHERE query_key = ?', (query_key,)) as cursor:
+            row = await cursor.fetchone()
+            if row and (now - row[1]) < max_age_seconds:
+                return json.loads(row[0])
+    return None
+
+async def set_cached_search(query_key, results_data):
+    now = int(time.time())
+    results_json = json.dumps(results_data)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('''
+            INSERT INTO search_cache (query_key, results_json, cached_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(query_key) DO UPDATE SET
+                results_json=excluded.results_json,
+                cached_at=excluded.cached_at
+        ''', (query_key, results_json, now))
         await db.commit()
 
 # --- CHAT MESSAGES ---
