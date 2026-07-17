@@ -10,6 +10,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -156,11 +158,15 @@
                 <header class="top-header">
                     <h2>Profile</h2>
                 </header>
-                <div class="profile-header-card">
-                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" alt="Avatar" class="profile-avatar" id="profileAvatar">
+                <div class="profile-header-card" style="position: relative; overflow: hidden; background: none;">
+                    <div id="profileBanner" style="position: absolute; top: 0; left: 0; width: 100%; height: 120px; background: #333; z-index: -1;">
+                        <img id="profileBannerImg" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.5;">
+                    </div>
+                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" alt="Avatar" class="profile-avatar" id="profileAvatar" style="margin-top: 60px;">
                     <h3 id="profileDisplayName">User</h3>
                     <p class="text-muted" id="profileUsername">@username</p>
                     <p class="profile-bio" id="profileBio">No bio added.</p>
+                    <button id="openEditProfileBtnMain" class="secondary-btn" style="margin: 15px auto; display: block; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Edit Profile</button>
                     <div class="profile-stats">
                         <div class="stat"><span class="val" id="profileFriendsCount">0</span><span class="lbl">Friends</span></div>
                         <div class="stat"><span class="val" id="profileFollowersCount">0</span><span class="lbl">Followers</span></div>
@@ -200,7 +206,7 @@
                 
                 <div class="settings-group">
                     <div class="settings-group-title">Account</div>
-                    <div class="setting-item">
+                    <div class="setting-item" id="openEditProfileBtnSettings" style="cursor: pointer;">
                         <span>Edit Profile</span>
                         <i class="fa-solid fa-chevron-right text-muted"></i>
                     </div>
@@ -329,6 +335,64 @@
         
         <!-- HIDDEN YOUTUBE PLAYER FOR AUDIO STREAMING -->
         <div id="hiddenAudioPlayerHost" style="position: absolute; width: 1px; height: 1px; top: -9999px; left: -9999px; opacity: 0; pointer-events: none;"></div>
+
+        <!-- Edit Profile Modal -->
+        <div id="editProfileModal" class="full-player-overlay hidden">
+            <div class="full-player-header">
+                <i class="fa-solid fa-chevron-down fa-xl" id="closeEditProfileBtn"></i>
+                <div class="header-title">Edit Profile</div>
+                <div style="width: 24px;"></div>
+            </div>
+            
+            <div class="edit-profile-content" style="padding: 20px; overflow-y: auto; height: calc(100% - 70px);">
+                <!-- Banner Upload -->
+                <div class="banner-upload-container" style="width: 100%; height: 150px; background: #333; border-radius: 12px; margin-bottom: -40px; position: relative; overflow: hidden;">
+                    <img id="editBannerPreview" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.7;">
+                    <div class="upload-btn-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                        <label for="bannerInput" class="upload-label"><i class="fa-solid fa-camera fa-2x"></i></label>
+                        <input type="file" id="bannerInput" accept="image/jpeg, image/png, image/webp" class="hidden-input">
+                    </div>
+                </div>
+                
+                <!-- Avatar Upload -->
+                <div class="avatar-upload-container" style="width: 100px; height: 100px; border-radius: 50%; background: #444; border: 4px solid #121212; position: relative; margin: 0 auto 20px auto; overflow: hidden; z-index: 2;">
+                    <img id="editAvatarPreview" style="width: 100%; height: 100%; object-fit: cover; opacity: 0.7;">
+                    <div class="upload-btn-overlay" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+                        <label for="avatarInput" class="upload-label"><i class="fa-solid fa-camera fa-xl"></i></label>
+                        <input type="file" id="avatarInput" accept="image/jpeg, image/png, image/webp" class="hidden-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Display Name</label>
+                    <input type="text" id="editDisplayName" class="dark-input" maxlength="30">
+                </div>
+                
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="editUsername" class="dark-input" maxlength="20">
+                </div>
+                
+                <div class="form-group">
+                    <label>Bio</label>
+                    <textarea id="editBio" class="dark-input" rows="3" maxlength="150"></textarea>
+                </div>
+                
+                <button id="saveProfileBtn" class="primary-btn" style="width: 100%; margin-top: 20px; padding: 15px; border-radius: 25px; font-weight: bold; font-size: 16px;">Save Changes</button>
+            </div>
+        </div>
+
+        <!-- Image Cropper Modal -->
+        <div id="cropperModal" class="full-player-overlay hidden" style="z-index: 10000; background: #000;">
+            <div class="full-player-header" style="background: rgba(0,0,0,0.8);">
+                <i class="fa-solid fa-xmark fa-xl" id="closeCropperBtn"></i>
+                <div class="header-title">Crop Image</div>
+                <i class="fa-solid fa-check fa-xl" id="confirmCropBtn" style="color: #1DB954;"></i>
+            </div>
+            <div class="cropper-container" style="width: 100%; height: calc(100% - 70px);">
+                <img id="cropperImage" style="max-width: 100%; display: block;">
+            </div>
+        </div>
 
     </div>
 

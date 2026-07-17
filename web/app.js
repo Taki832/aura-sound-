@@ -61,6 +61,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupRoomUI();
     setupPlayerControls();
     setupSettings();
+    setupEditProfile();
     
     // Setup Telegram WebApp
     if (window.Telegram && window.Telegram.WebApp) {
@@ -86,8 +87,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                     // Populate Profile View
                     document.getElementById('profileDisplayName').textContent = currentUser.display_name || "User";
                     document.getElementById('profileUsername').textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
+                    document.getElementById('profileBio').textContent = currentUser.bio || "No bio added.";
                     if (currentUser.avatar_url) {
                         document.getElementById('profileAvatar').src = currentUser.avatar_url;
+                    }
+                    if (currentUser.banner_url) {
+                        document.getElementById('profileBannerImg').src = currentUser.banner_url;
                     }
                     if (currentUser.theme === 'light') {
                         document.body.classList.add('light-theme');
@@ -614,4 +619,135 @@ function setupSettings() {
     document.getElementById('settingGapless')?.addEventListener('change', updateSettings);
     document.getElementById('settingHqAudio')?.addEventListener('change', updateSettings);
     document.getElementById('settingGlassEffects')?.addEventListener('change', updateSettings);
+}
+
+// --- Edit Profile & Image Cropper ---
+function setupEditProfile() {
+    const modal = document.getElementById('editProfileModal');
+    const closeBtn = document.getElementById('closeEditProfileBtn');
+    const saveBtn = document.getElementById('saveProfileBtn');
+    
+    // Inputs
+    const inputDisplay = document.getElementById('editDisplayName');
+    const inputUsername = document.getElementById('editUsername');
+    const inputBio = document.getElementById('editBio');
+    
+    // Images
+    let avatarBlob = null;
+    let bannerBlob = null;
+
+    const openModal = () => {
+        if (!currentUser) return;
+        inputDisplay.value = currentUser.display_name || '';
+        inputUsername.value = currentUser.username || '';
+        inputBio.value = currentUser.bio || '';
+        if (currentUser.avatar_url) document.getElementById('editAvatarPreview').src = currentUser.avatar_url;
+        if (currentUser.banner_url) document.getElementById('editBannerPreview').src = currentUser.banner_url;
+        modal.classList.remove('hidden');
+    };
+
+    document.getElementById('openEditProfileBtnMain')?.addEventListener('click', openModal);
+    document.getElementById('openEditProfileBtnSettings')?.addEventListener('click', openModal);
+    closeBtn?.addEventListener('click', () => modal.classList.add('hidden'));
+
+    // Cropper State
+    let cropper = null;
+    let currentCropTarget = null; // 'avatar' or 'banner'
+    const cropperModal = document.getElementById('cropperModal');
+    const cropperImage = document.getElementById('cropperImage');
+    
+    const handleFileSelect = (e, target) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+            showToast("File too large. Max 10MB");
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            cropperImage.src = evt.target.result;
+            cropperModal.classList.remove('hidden');
+            currentCropTarget = target;
+            
+            if (cropper) cropper.destroy();
+            cropper = new Cropper(cropperImage, {
+                aspectRatio: target === 'avatar' ? 1 : 16/9,
+                viewMode: 1,
+                background: false
+            });
+        };
+        reader.readAsDataURL(file);
+        e.target.value = ''; // reset
+    };
+
+    document.getElementById('avatarInput')?.addEventListener('change', (e) => handleFileSelect(e, 'avatar'));
+    document.getElementById('bannerInput')?.addEventListener('change', (e) => handleFileSelect(e, 'banner'));
+
+    document.getElementById('closeCropperBtn')?.addEventListener('click', () => {
+        cropperModal.classList.add('hidden');
+        if (cropper) cropper.destroy();
+    });
+
+    document.getElementById('confirmCropBtn')?.addEventListener('click', () => {
+        if (!cropper) return;
+        const canvas = cropper.getCroppedCanvas({
+            width: currentCropTarget === 'avatar' ? 256 : 1024,
+            height: currentCropTarget === 'avatar' ? 256 : 576
+        });
+        
+        // Compress to JPEG 0.8
+        canvas.toBlob((blob) => {
+            const url = URL.createObjectURL(blob);
+            if (currentCropTarget === 'avatar') {
+                document.getElementById('editAvatarPreview').src = url;
+                avatarBlob = blob;
+            } else {
+                document.getElementById('editBannerPreview').src = url;
+                bannerBlob = blob;
+            }
+            cropperModal.classList.add('hidden');
+            cropper.destroy();
+        }, 'image/jpeg', 0.8);
+    });
+
+    saveBtn?.addEventListener('click', async () => {
+        if (!currentUser) return;
+        saveBtn.textContent = 'Saving...';
+        
+        const formData = new FormData();
+        formData.append('id', currentUser.id);
+        formData.append('display_name', inputDisplay.value);
+        formData.append('username', inputUsername.value);
+        formData.append('bio', inputBio.value);
+        
+        if (avatarBlob) formData.append('avatar_file', avatarBlob, 'avatar.jpg');
+        if (bannerBlob) formData.append('banner_file', bannerBlob, 'banner.jpg');
+
+        try {
+            const res = await fetch('/api/profile/update', {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (data.user) {
+                currentUser = data.user;
+                // Update UI immediately
+                document.getElementById('profileDisplayName').textContent = currentUser.display_name;
+                document.getElementById('profileUsername').textContent = `@${currentUser.username}`;
+                document.getElementById('profileBio').textContent = currentUser.bio;
+                if(currentUser.avatar_url) document.getElementById('profileAvatar').src = currentUser.avatar_url;
+                if(currentUser.banner_url) document.getElementById('profileBannerImg').src = currentUser.banner_url;
+                
+                showToast("Profile Updated Successfully");
+                modal.classList.add('hidden');
+            } else {
+                showToast("Failed to update profile");
+            }
+        } catch(e) {
+            console.error(e);
+            showToast("Network Error");
+        }
+        saveBtn.textContent = 'Save Changes';
+    });
 }

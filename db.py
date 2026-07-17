@@ -21,7 +21,8 @@ async def init_db():
                 rooms_joined INTEGER DEFAULT 0,
                 theme TEXT DEFAULT 'dark',
                 accent_color TEXT DEFAULT '#1DB954',
-                settings_json TEXT DEFAULT '{}'
+                settings_json TEXT DEFAULT '{}',
+                banner_url TEXT
             )
         ''')
         

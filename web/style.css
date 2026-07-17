@@ -747,3 +747,63 @@ input:checked + .slider:before { transform: translateX(20px); }
     justify-content: center;
     align-items: center;
 }
+
+/* --- Edit Profile & Cropper Styles --- */
+.edit-profile-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.upload-btn-overlay {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.banner-upload-container:hover .upload-btn-overlay,
+.avatar-upload-container:hover .upload-btn-overlay {
+    opacity: 1;
+}
+.upload-label {
+    cursor: pointer;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+    padding: 10px;
+    border-radius: 50%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+.hidden-input {
+    display: none;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+.form-group label {
+    font-size: 13px;
+    color: #b3b3b3;
+    font-weight: 600;
+}
+.dark-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+}
+.dark-input:focus {
+    outline: 2px solid #1DB954;
+    background: rgba(255, 255, 255, 0.15);
+}
+textarea.dark-input {
+    resize: none;
+}
+
+.cropper-container {
+    background-color: #000;
+}

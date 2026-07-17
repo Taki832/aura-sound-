@@ -14,6 +14,9 @@ import time
 import traceback
 from aiohttp import web, WSMsgType
 
+import db
+from storage import StorageService
+
 # Fix Windows console encoding
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
@@ -391,16 +394,38 @@ async def api_auth_handler(request):
 
 async def api_update_profile_handler(request):
     try:
-        data = await request.json()
+        if request.content_type == 'application/json':
+            data = await request.json()
+        elif request.content_type.startswith('multipart/form-data'):
+            data = {}
+            post_data = await request.post()
+            for key, val in post_data.items():
+                if isinstance(val, web.FileField):
+                    data[key] = val
+                else:
+                    data[key] = val
+        else:
+            return web.json_response({'error': 'Unsupported content type'}, status=400)
+
         user_id = data.get('id')
         if not user_id:
             return web.json_response({'error': 'User ID required'}, status=400)
             
-        # Extract fields to update
         updates = {}
-        for key in ['theme', 'accent_color', 'settings_json', 'bio', 'display_name', 'username', 'avatar_url']:
-            if key in data:
+        for key in ['theme', 'accent_color', 'settings_json', 'bio', 'display_name', 'username']:
+            if key in data and not isinstance(data[key], web.FileField):
                 updates[key] = data[key]
+                
+        # Handle file uploads via StorageService
+        if 'avatar_file' in data and isinstance(data['avatar_file'], web.FileField):
+            file_bytes = data['avatar_file'].file.read()
+            url = await StorageService.uploadAvatar(user_id, file_bytes)
+            updates['avatar_url'] = url
+            
+        if 'banner_file' in data and isinstance(data['banner_file'], web.FileField):
+            file_bytes = data['banner_file'].file.read()
+            url = await StorageService.uploadBanner(user_id, file_bytes)
+            updates['banner_url'] = url
                 
         if updates:
             await db.update_user_profile(user_id, updates)
