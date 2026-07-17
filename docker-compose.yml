@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  aurasound:
+    build: .
+    container_name: aurasound_app
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./aurasound.db:/app/aurasound.db
+      - ./web/uploads:/app/web/uploads
+    environment:
+      - PORT=8000
+      - PYTHONUNBUFFERED=1
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

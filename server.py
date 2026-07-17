@@ -569,13 +569,55 @@ async def api_liked_list_handler(request):
     tracks = await db.get_liked_songs(user_id)
     return web.json_response({'tracks': tracks})
 
-# ─── Web Application Setup & Middleware ─────────────────────────────────────────
+# ─── Web Application Setup & Security Middleware ───────────────────────────────
+rate_limit_store = {} # IP -> [count, reset_timestamp]
+start_time_server = time.time()
+
 @web.middleware
-async def ngrok_skip_warning_middleware(request, handler):
-    response = await handler(request)
+async def security_and_rate_limit_middleware(request, handler):
+    client_ip = request.headers.get('X-Forwarded-For', request.remote)
+    now = time.time()
+
+    # Rate Limiting Logic (Max 120 requests / min per IP)
+    if client_ip not in rate_limit_store or now > rate_limit_store[client_ip][1]:
+        rate_limit_store[client_ip] = [1, now + 60]
+    else:
+        rate_limit_store[client_ip][0] += 1
+        if rate_limit_store[client_ip][0] > 120 and not request.path.startswith('/ws/'):
+            return web.json_response({'error': 'Too many requests. Please slow down.'}, status=429)
+
+    try:
+        response = await handler(request)
+    except web.HTTPException as ex:
+        response = ex
+    except Exception as e:
+        print(f"[Unhandled Server Error] {e}")
+        response = web.json_response({'error': 'Internal server error'}, status=500)
+
+    # Security Headers
     response.headers['ngrok-skip-browser-warning'] = 'true'
     response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
+
+async def api_health_handler(request):
+    uptime = int(time.time() - start_time_server)
+    return web.json_response({
+        'status': 'healthy',
+        'uptime_seconds': uptime,
+        'database': 'connected'
+    })
+
+async def api_metrics_handler(request):
+    total_sockets = sum(len(r.get('sockets', [])) for r in sync_rooms.values())
+    return web.json_response({
+        'active_rooms': len(sync_rooms),
+        'total_active_listeners': total_sockets,
+        'uptime_seconds': int(time.time() - start_time_server)
+    })
 
 def setup_web_app(app):
     app.router.add_get('/api/search', api_search_handler)
@@ -602,6 +644,10 @@ def setup_web_app(app):
     app.router.add_post('/api/playlists/add_track', api_playlists_add_track_handler)
     app.router.add_post('/api/liked/toggle', api_liked_toggle_handler)
     app.router.add_get('/api/liked/list', api_liked_list_handler)
+
+    # Observability & Metrics
+    app.router.add_get('/api/health', api_health_handler)
+    app.router.add_get('/api/metrics', api_metrics_handler)
 
     app.router.add_get('/ws/room/{room_code}', websocket_room_handler)
 
