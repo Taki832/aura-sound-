@@ -43,12 +43,12 @@ class AIEngine:
         if cached:
             return cached
 
-        # Fallback preset recommendations
-        recommendations = [
-            {'title': f"{mood.capitalize()} Vibe - {selected_query}", 'yt_id': 'rec_1', 'duration': 210, 'thumbnail': 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300'},
-            {'title': f"Aura Mix - {selected_query}", 'yt_id': 'rec_2', 'duration': 195, 'thumbnail': 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=300'},
-            {'title': f"Deep Beats 2032 - {mood}", 'yt_id': 'rec_3', 'duration': 240, 'thumbnail': 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=300'}
-        ]
+        # Perform REAL live search for mood query
+        import asyncio
+        from server import multi_source_search
+        loop = asyncio.get_running_loop()
+        recommendations = await loop.run_in_executor(None, multi_source_search, selected_query, 'all', 6)
         
-        await db.set_cached_search(cache_key, recommendations)
+        if recommendations:
+            await db.set_cached_search(cache_key, recommendations)
         return recommendations

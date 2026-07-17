@@ -561,6 +561,9 @@ function handleServerState(state) {
     if (state.members) {
         document.getElementById('memberCount').textContent = state.members.length;
         document.getElementById('membersUl').innerHTML = state.members.map((m, i) => `<li>${m} ${i===0?'(Host)':''}</li>`).join('');
+        if (window.auraIsland) {
+            window.auraIsland.setMembers(state.members);
+        }
     }
 
     // Apply Track changes

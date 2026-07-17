@@ -91,7 +91,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const el = document.getElementById('auraIslandContainer');
     if (el) {
         window.auraIsland = new AuraIsland('auraIslandContainer');
-        window.auraIsland.setMembers(['Vishnu (Host)', 'Listener 1', 'Listener 2']);
         window.auraIsland.start();
     }
 });
