@@ -186,7 +186,7 @@ async function performSearch(query) {
             const el = document.createElement('div');
             el.className = 'track-item';
             el.innerHTML = `
-                <img src="${track.thumbnail}" alt="Art">
+                <img src="${track.thumbnail || 'https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400'}" alt="Art" onerror="this.src='https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400'">
                 <div class="track-info">
                     <div class="track-title">${track.title}</div>
                     <div class="track-meta">
@@ -312,8 +312,17 @@ function applyTrackUI(track, asVideo) {
     miniPlayer.classList.remove('hidden');
     document.getElementById('miniTitle').textContent = track.title;
     document.getElementById('fullTitle').textContent = track.title;
-    document.getElementById('miniArt').src = track.thumbnail;
-    fullArt.src = track.thumbnail;
+    
+    const fallbackArt = 'https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400';
+    const miniArt = document.getElementById('miniArt');
+    const fullArtEl = document.getElementById('fullArt');
+    
+    miniArt.src = track.thumbnail || fallbackArt;
+    miniArt.onerror = () => { miniArt.src = fallbackArt; };
+    
+    fullArtEl.src = track.thumbnail || fallbackArt;
+    fullArtEl.onerror = () => { fullArtEl.src = fallbackArt; };
+    
     timeTotal.textContent = formatTime(track.duration);
     seekSlider.max = track.duration;
 
@@ -388,7 +397,7 @@ async function initRoom(asHost, asVideoRoom, code = "") {
     
     if (asHost) {
         try {
-            const res = await fetch('/api/room', {
+            const res = await fetch('/api/room/create', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: user })
