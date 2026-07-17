@@ -36,7 +36,7 @@ TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"  # @Crazycand
 TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"  # @Taki832_bot
 MINI_APP_URL    = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
 
-SESSION_DIR = r"c:\Users\VISHNU\Videos\mine"
+SESSION_DIR = "."
 python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
 mojo_bot   = Client(os.path.join(SESSION_DIR, "mojo_bot_session"),   api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
 
