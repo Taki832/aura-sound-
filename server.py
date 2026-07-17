@@ -23,7 +23,6 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace', write_through=True)
 
 import yt_dlp
-import db
 
 # Fix for Pyrogram import on Python 3.10+
 try:
@@ -33,23 +32,29 @@ except RuntimeError:
 
 MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
 
-try:
-    from pyrogram import Client, filters
-    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-    
-    # ─── Telegram Bot Credentials & WebApp Config ─────────────────────────
-    API_ID          = 28640193
-    API_HASH        = "f21327975cce7fb1e9c0fd9d72e0812a"
-    TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"  # @Crazycando_bot
-    TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"  # @Taki832_bot
+# Telegram bots are opt-in: set ENABLE_BOTS=1 to activate
+BOTS_ENABLED = False
+python_bot = None
+mojo_bot = None
 
-    SESSION_DIR = "."
-    python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
-    mojo_bot = Client(os.path.join(SESSION_DIR, "mojo_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
-    BOTS_ENABLED = True
-except ImportError:
-    print("[Notice] Pyrogram module not installed. Running Web Server in standalone mode.")
-    BOTS_ENABLED = False
+if os.environ.get("ENABLE_BOTS", "0") == "1":
+    try:
+        from pyrogram import Client, filters
+        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        
+        API_ID          = 28640193
+        API_HASH        = "f21327975cce7fb1e9c0fd9d72e0812a"
+        TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"
+        TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"
+
+        SESSION_DIR = "."
+        python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
+        mojo_bot = Client(os.path.join(SESSION_DIR, "mojo_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
+        BOTS_ENABLED = True
+    except ImportError:
+        print("[Notice] Pyrogram not installed. Bots disabled.")
+else:
+    print("[Notice] Telegram bots disabled. Set ENABLE_BOTS=1 to activate.")
 
 # ─── Global Server-Driven Room State ─────────────────────────────────────────
 sync_rooms = {}
@@ -305,7 +310,8 @@ async def websocket_room_handler(request):
                     asyncio.create_task(db.save_room_state(room_code, room['name'], 0, room['current_track'], False, room['is_video'], room['start_time'], pos))
 
                 elif action_type == 'ACTION_SEEK':
-                    pos = coerce_position(data.get('position', 0), duration)
+                    track_dur = (room.get('current_track') or {}).get('duration', 0)
+                    pos = coerce_position(data.get('position', 0), track_dur)
                     room['pause_offset'] = pos
                     if room['is_playing']:
                         room['start_time'] = time.time() - pos
@@ -577,6 +583,58 @@ async def api_liked_list_handler(request):
     tracks = await db.get_liked_songs(user_id)
     return web.json_response({'tracks': tracks})
 
+# --- LISTENING HISTORY & SEARCH HISTORY API ---
+async def api_listening_history_handler(request):
+    user_id = request.query.get('user_id')
+    if not user_id:
+        return web.json_response({'tracks': []})
+    tracks = await db.get_listening_history(int(user_id))
+    return web.json_response({'tracks': tracks})
+
+async def api_track_played_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    track = data.get('track')
+    if user_id and track:
+        await db.add_listening_history(int(user_id), track)
+    return web.json_response({'success': True})
+
+async def api_search_history_handler(request):
+    user_id = request.query.get('user_id')
+    if not user_id:
+        return web.json_response({'history': []})
+    history = await db.get_search_history(int(user_id))
+    return web.json_response({'history': history})
+
+async def api_save_search_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    query = data.get('query', '').strip()
+    if user_id and query:
+        await db.save_search_query(int(user_id), query)
+    return web.json_response({'success': True})
+
+async def api_clear_search_history_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    if user_id:
+        await db.clear_search_history(int(user_id))
+    return web.json_response({'success': True})
+
+async def api_user_stats_handler(request):
+    user_id = request.query.get('user_id')
+    if not user_id:
+        return web.json_response({'stats': {}})
+    stats = await db.get_user_stats(int(user_id))
+    return web.json_response({'stats': stats})
+
+async def api_mark_all_notifications_read_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    if user_id:
+        await db.mark_all_notifications_read(int(user_id))
+    return web.json_response({'success': True})
+
 # --- AI DJ & RECOMMENDATIONS API ---
 async def api_ai_recommendations_handler(request):
     user_id = request.query.get('user_id')
@@ -666,6 +724,15 @@ def setup_web_app(app):
     app.router.add_post('/api/liked/toggle', api_liked_toggle_handler)
     app.router.add_get('/api/liked/list', api_liked_list_handler)
 
+    # Listening & Search History
+    app.router.add_get('/api/history/listening', api_listening_history_handler)
+    app.router.add_post('/api/history/track_played', api_track_played_handler)
+    app.router.add_get('/api/history/search', api_search_history_handler)
+    app.router.add_post('/api/history/save_search', api_save_search_handler)
+    app.router.add_post('/api/history/clear_search', api_clear_search_history_handler)
+    app.router.add_get('/api/user/stats', api_user_stats_handler)
+    app.router.add_post('/api/notifications/read_all', api_mark_all_notifications_read_handler)
+
     # Observability & Metrics
     app.router.add_get('/api/health', api_health_handler)
     app.router.add_get('/api/metrics', api_metrics_handler)
@@ -695,13 +762,18 @@ async def main():
 
     if BOTS_ENABLED:
         try:
-            print("[1/5] Starting Telegram Bots...")
-            await python_bot.start()
-            await mojo_bot.start()
+            print("[1/5] Starting Telegram Bots (10s timeout)...")
+            await asyncio.wait_for(python_bot.start(), timeout=10)
+            await asyncio.wait_for(mojo_bot.start(), timeout=10)
+            print("  ✓ Telegram Bots connected successfully")
+        except asyncio.TimeoutError:
+            print("  ⚠ Telegram Bot startup timed out — running in web-only mode")
         except Exception as e:
-            print(f"[Telegram Bot Startup Skipped] {e}")
+            print(f"  ⚠ Telegram Bot Startup Skipped: {e}")
+    else:
+        print("[1/5] Telegram Bots disabled (pyrogram not installed)")
 
-    print("[2/4] Spawning Server Heartbeat Sync Loop...")
+    print("[2/5] Spawning Server Heartbeat Sync Loop...")
     asyncio.create_task(room_heartbeat_loop())
 
     print("[3/5] Setting Up Web App Routes...")

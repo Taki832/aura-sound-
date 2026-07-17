@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AuraSound AI — Spotify Clone</title>
+    <title>AuraSound AI — Music & Video Sync</title>
+    <meta name="description" content="AuraSound AI - Listen to music and watch videos in perfect sync with friends. Real-time audio & video sync rooms powered by AI.">
     <!-- Spotify-like font (Inter) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,9 +39,8 @@
                     <button class="pill" data-source="jiosaavn">JioSaavn</button>
                 </div>
 
-                <div class="section-title">Play What You Love</div>
+                <div class="section-title">Recently Played</div>
                 <div class="grid-2-col" id="trendingGrid">
-                    <!-- Populated dynamically by backend history/trends -->
                     <div class="empty-search" style="grid-column: span 2;">
                         <p class="text-muted" style="font-size: 14px;">Listen to songs, and your history will appear here.</p>
                     </div>
@@ -114,13 +114,13 @@
                     <!-- Active Room State -->
                     <div id="roomActiveState" class="hidden">
                         <div class="live-badge"><div class="dot-pulse"></div> LIVE SYNC</div>
-                        <h3 id="activeRoomName">Vishnu's Room</h3>
-                        <p class="room-code-display">Code: <strong id="activeRoomCode">XXXXXX</strong> <i class="fa-regular fa-copy" id="copyCodeIcon"></i></p>
+                        <h3 id="activeRoomName">Room</h3>
+                        <p class="room-code-display">Code: <strong id="activeRoomCode">XXXXXX</strong> <i class="fa-regular fa-copy" id="copyCodeIcon" style="cursor:pointer;"></i></p>
                         
                         <div class="room-members-list">
                             <h4>Members (<span id="memberCount">1</span>)</h4>
                             <ul id="membersUl">
-                                <li>Vishnu (Host)</li>
+                                <li>Waiting...</li>
                             </ul>
                         </div>
 
@@ -147,20 +147,46 @@
                 <header class="top-header">
                     <h2>Your Library</h2>
                     <div class="header-icons">
-                        <i class="fa-solid fa-magnifying-glass"></i>
-                        <i class="fa-solid fa-plus"></i>
+                        <i class="fa-solid fa-plus" id="btnCreatePlaylist" style="cursor:pointer;" title="Create Playlist"></i>
                     </div>
                 </header>
-                <div class="library-list" id="libraryList">
-                    <div class="library-item liked-songs-item">
-                        <div class="liked-icon"><i class="fa-solid fa-heart"></i></div>
-                        <div class="lib-info">
-                            <h4>Liked Songs</h4>
-                            <p><span id="likedCount">0</span> songs</p>
+                
+                <!-- Main Library Content -->
+                <div id="libraryContent">
+                    <div class="library-list" id="libraryList">
+                        <div class="library-item liked-songs-item" style="cursor:pointer;">
+                            <div class="liked-icon"><i class="fa-solid fa-heart"></i></div>
+                            <div class="lib-info">
+                                <h4>Liked Songs</h4>
+                                <p><span id="likedCount">0</span> songs</p>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-muted"></i>
                         </div>
+                    </div>
+
+                    <div class="section-title" style="margin-top:16px;">Your Playlists</div>
+                    <div id="playlistsContainer">
+                        <div class="text-muted" style="font-size:14px;padding:8px;">No playlists yet. Create one!</div>
+                    </div>
+
+                    <div class="section-title" style="margin-top:16px;">Queue (<span id="queueCount">0</span>)</div>
+                    <div id="queueList">
+                        <div class="text-muted" style="font-size:14px;padding:16px;">Queue is empty. Search and add songs!</div>
+                    </div>
+                </div>
+
+                <!-- Liked Songs Panel (hidden by default) -->
+                <div id="likedSongsPanel" class="hidden">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+                        <i class="fa-solid fa-chevron-left" id="backFromLiked" style="font-size:20px;cursor:pointer;padding:8px;"></i>
+                        <h3>Liked Songs</h3>
+                    </div>
+                    <div id="likedSongsTrackList" class="track-list">
+                        <!-- Populated by JS -->
                     </div>
                 </div>
             </section>
+
             <!-- PROFILE VIEW -->
             <section id="view-profile" class="view-section">
                 <header class="top-header">
@@ -177,7 +203,7 @@
                     <button id="openEditProfileBtnMain" class="secondary-btn" style="margin: 15px auto; display: block; border-radius: 20px; padding: 8px 20px; font-weight: 600;">Edit Profile</button>
                     <div class="profile-stats">
                         <div class="stat"><span class="val" id="profileFriendsCount">0</span><span class="lbl">Friends</span></div>
-                        <div class="stat"><span class="val" id="profileFollowersCount">0</span><span class="lbl">Followers</span></div>
+                        <div class="stat"><span class="val" id="profileFollowersCount">0</span><span class="lbl">Songs Played</span></div>
                         <div class="stat"><span class="val" id="profileRoomsCount">0</span><span class="lbl">Rooms</span></div>
                     </div>
                 </div>
@@ -197,7 +223,7 @@
             <section id="view-notifications" class="view-section">
                 <header class="top-header">
                     <h2>Notifications</h2>
-                    <i class="fa-solid fa-check-double text-muted"></i>
+                    <i class="fa-solid fa-check-double text-muted" id="markAllReadBtn" style="cursor:pointer;" title="Mark All Read" onclick="markAllRead()"></i>
                 </header>
                 <div class="notifications-list" id="notificationsList">
                     <div class="empty-search">
@@ -249,7 +275,7 @@
                 </div>
                 
                 <div class="settings-group" style="margin-bottom: 40px; text-align: center; color: #e91e63;">
-                    <div class="setting-item" style="justify-content: center;">
+                    <div class="setting-item" id="logoutBtn" style="justify-content: center; cursor: pointer;">
                         <span>Logout</span>
                     </div>
                 </div>

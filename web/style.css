@@ -807,3 +807,135 @@ textarea.dark-input {
 .cropper-container {
     background-color: #000;
 }
+
+/* --- Track Actions (Queue, Play, Video buttons) --- */
+.track-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+.track-actions i {
+    font-size: 16px;
+    color: var(--text-subdued);
+    cursor: pointer;
+    padding: 4px;
+    transition: color 0.2s ease, transform 0.15s ease;
+}
+.track-actions i:hover {
+    color: var(--spotify-green);
+    transform: scale(1.15);
+}
+.track-actions .play-audio-btn:hover {
+    color: var(--spotify-green);
+}
+.track-actions .play-video-btn:hover {
+    color: #e91e63;
+}
+.track-actions .add-queue-btn:hover {
+    color: #00e5ff;
+}
+
+/* --- Queue & Library --- */
+.queue-item.played {
+    opacity: 0.5;
+}
+.library-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.library-item .lib-info h4 {
+    font-size: 15px;
+    font-weight: 600;
+}
+.library-item .lib-info p {
+    font-size: 13px;
+    color: var(--text-subdued);
+}
+
+/* --- Search History --- */
+.search-history-item {
+    transition: background 0.2s ease;
+}
+.search-history-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+.text-btn {
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+.text-btn:hover {
+    opacity: 0.8;
+}
+
+/* --- Notification Items --- */
+.notification-item {
+    transition: background 0.2s ease;
+}
+.notification-item.unread {
+    background: rgba(29, 185, 84, 0.05);
+    border-left: 3px solid var(--spotify-green);
+}
+.notification-item.read {
+    opacity: 0.7;
+}
+
+/* --- Liked Songs Panel --- */
+#likedSongsPanel .track-item {
+    cursor: pointer;
+}
+#likedSongsPanel .track-item:hover {
+    background: rgba(255,255,255,0.05);
+}
+
+/* --- Primary Button --- */
+.primary-btn {
+    background: var(--spotify-green);
+    color: #000;
+    border: none;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.primary-btn:hover {
+    background: var(--spotify-green-hover);
+    transform: scale(1.02);
+}
+
+/* --- Mini Player Fav Button --- */
+#miniFavBtn, #fullFavBtn {
+    cursor: pointer;
+    transition: color 0.2s ease, transform 0.15s ease;
+}
+#miniFavBtn:hover, #fullFavBtn:hover {
+    transform: scale(1.2);
+}
+
+/* --- Responsive Grid for Recently Played --- */
+.grid-2-col .recent-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-elevated);
+    border-radius: 8px;
+    padding: 0;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    height: 56px;
+}
+.grid-2-col .recent-card:hover {
+    background: var(--bg-highlight);
+}
+.grid-2-col .recent-card img {
+    border-radius: 8px 0 0 8px;
+}
+.grid-2-col .recent-title {
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.3;
+    padding-right: 8px;
+}

@@ -95,6 +95,41 @@ async def init_db():
             )
         ''')
 
+        # Notifications Table
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                type TEXT,
+                title TEXT,
+                message TEXT,
+                data_json TEXT DEFAULT '{}',
+                is_read INTEGER DEFAULT 0,
+                created_at INTEGER
+            )
+        ''')
+
+        # Liked Songs Table
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS liked_songs (
+                user_id INTEGER,
+                track_id TEXT,
+                track_json TEXT,
+                liked_at INTEGER,
+                PRIMARY KEY (user_id, track_id)
+            )
+        ''')
+
+        # Search History Table
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS search_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                query TEXT,
+                searched_at INTEGER
+            )
+        ''')
+
         await db.commit()
 
 # --- ROOM PERSISTENCE FUNCTIONS ---
@@ -373,4 +408,80 @@ async def add_listening_history(user_id, track_data):
             VALUES (?, ?, ?)
         ''', (user_id, json.dumps(track_data), now))
         await db.commit()
+
+async def get_listening_history(user_id, limit=20):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            'SELECT track_json, played_at FROM listening_history WHERE user_id = ? ORDER BY played_at DESC LIMIT ?',
+            (user_id, limit)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            result = []
+            seen = set()
+            for r in rows:
+                track = json.loads(r[0])
+                key = track.get('yt_id') or track.get('title')
+                if key not in seen:
+                    seen.add(key)
+                    track['played_at'] = r[1]
+                    result.append(track)
+            return result
+
+# --- SEARCH HISTORY ---
+async def save_search_query(user_id, query):
+    if not user_id or not query:
+        return
+    now = int(time.time())
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Remove old duplicate
+        await db.execute('DELETE FROM search_history WHERE user_id = ? AND query = ?', (user_id, query))
+        await db.execute('INSERT INTO search_history (user_id, query, searched_at) VALUES (?, ?, ?)', (user_id, query, now))
+        # Keep only latest 20
+        await db.execute('''
+            DELETE FROM search_history WHERE user_id = ? AND id NOT IN (
+                SELECT id FROM search_history WHERE user_id = ? ORDER BY searched_at DESC LIMIT 20
+            )
+        ''', (user_id, user_id))
+        await db.commit()
+
+async def get_search_history(user_id, limit=10):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            'SELECT query, searched_at FROM search_history WHERE user_id = ? ORDER BY searched_at DESC LIMIT ?',
+            (user_id, limit)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [{'query': r[0], 'searched_at': r[1]} for r in rows]
+
+async def clear_search_history(user_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('DELETE FROM search_history WHERE user_id = ?', (user_id,))
+        await db.commit()
+
+async def mark_all_notifications_read(user_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('UPDATE notifications SET is_read = 1 WHERE user_id = ?', (user_id,))
+        await db.commit()
+
+async def get_user_stats(user_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Count listening history
+        async with db.execute('SELECT COUNT(*) FROM listening_history WHERE user_id = ?', (user_id,)) as c:
+            songs_played = (await c.fetchone())[0]
+        # Count rooms
+        async with db.execute('SELECT rooms_joined FROM users WHERE id = ?', (user_id,)) as c:
+            row = await c.fetchone()
+            rooms_joined = row[0] if row else 0
+        # Count friends
+        async with db.execute("SELECT COUNT(*) FROM friends WHERE user_id = ? AND status = 'accepted'", (user_id,)) as c:
+            friends_count = (await c.fetchone())[0]
+        # Count liked
+        async with db.execute('SELECT COUNT(*) FROM liked_songs WHERE user_id = ?', (user_id,)) as c:
+            liked_count = (await c.fetchone())[0]
+        return {
+            'songs_played': songs_played,
+            'rooms_joined': rooms_joined,
+            'friends_count': friends_count,
+            'liked_count': liked_count
+        }
 
