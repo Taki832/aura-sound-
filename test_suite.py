@@ -84,9 +84,21 @@ async def run_tests():
     cached = await db.get_cached_search(cache_key)
     assert cached is not None
     assert cached[0]['yt_id'] == 'ks123'
-    print("[PASS] [10/10] Search Caching & Deduplication Passed")
+    print("[PASS] [10/12] Search Caching & Deduplication Passed")
 
-    print("\n[SUCCESS] ALL 10 AUTOMATED SYSTEM STABILITY TESTS PASSED SUCCESSFULLY!")
+    # 11. AI DJ Commentary Generation
+    from ai_engine import AIEngine
+    dj_text = AIEngine.generate_dj_commentary("Katchi Sera")
+    assert len(dj_text) > 10
+    assert "Katchi Sera" in dj_text
+    print("[PASS] [11/12] AI DJ Commentary Generation Passed")
+
+    # 12. Smart Recommendations Engine
+    recs = await AIEngine.get_smart_recommendations(test_user_id, "chill")
+    assert len(recs) >= 1
+    print("[PASS] [12/12] AI Smart Recommendations Engine Passed")
+
+    print("\n[SUCCESS] ALL 12 AUTOMATED SYSTEM TESTS PASSED SUCCESSFULLY!")
 
 if __name__ == "__main__":
     asyncio.run(run_tests())

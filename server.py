@@ -16,6 +16,7 @@ from aiohttp import web, WSMsgType
 
 import db
 from storage import StorageService
+from ai_engine import AIEngine
 
 # Fix Windows console encoding
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace', write_through=True)
@@ -569,6 +570,19 @@ async def api_liked_list_handler(request):
     tracks = await db.get_liked_songs(user_id)
     return web.json_response({'tracks': tracks})
 
+# --- AI DJ & RECOMMENDATIONS API ---
+async def api_ai_recommendations_handler(request):
+    user_id = request.query.get('user_id')
+    mood = request.query.get('mood', 'chill')
+    recs = await AIEngine.get_smart_recommendations(user_id, mood)
+    return web.json_response({'recommendations': recs, 'mood': mood})
+
+async def api_ai_dj_voice_handler(request):
+    data = await request.json()
+    track_title = data.get('title', '')
+    commentary = AIEngine.generate_dj_commentary(track_title)
+    return web.json_response({'commentary': commentary})
+
 # ─── Web Application Setup & Security Middleware ───────────────────────────────
 rate_limit_store = {} # IP -> [count, reset_timestamp]
 start_time_server = time.time()
@@ -648,6 +662,10 @@ def setup_web_app(app):
     # Observability & Metrics
     app.router.add_get('/api/health', api_health_handler)
     app.router.add_get('/api/metrics', api_metrics_handler)
+
+    # AI Engine & DJ
+    app.router.add_get('/api/ai/recommendations', api_ai_recommendations_handler)
+    app.router.add_post('/api/ai/dj_voice', api_ai_dj_voice_handler)
 
     app.router.add_get('/ws/room/{room_code}', websocket_room_handler)
 
