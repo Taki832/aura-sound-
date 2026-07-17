@@ -81,6 +81,16 @@ document.addEventListener("DOMContentLoaded", async () => {
                 if (authData.user) {
                     currentUser = authData.user;
                     console.log("Authenticated as:", currentUser.username || currentUser.display_name);
+                    
+                    // Populate Profile View
+                    document.getElementById('profileDisplayName').textContent = currentUser.display_name || "User";
+                    document.getElementById('profileUsername').textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
+                    if (currentUser.avatar_url) {
+                        document.getElementById('profileAvatar').src = currentUser.avatar_url;
+                    }
+                    if (currentUser.theme === 'light') {
+                        document.body.classList.add('light-theme');
+                    }
                 }
             } catch (e) {
                 console.error("Auth failed", e);
@@ -146,6 +156,17 @@ function setupNavigation() {
             document.getElementById(item.dataset.target).classList.add('active');
         });
     });
+
+    // Top Header Navigation (Phase 3)
+    const openView = (viewId) => {
+        navItems.forEach(n => n.classList.remove('active'));
+        views.forEach(v => v.classList.remove('active'));
+        document.getElementById(viewId).classList.add('active');
+    };
+    
+    document.getElementById('btnNavNotifications')?.addEventListener('click', () => openView('view-notifications'));
+    document.getElementById('btnNavProfile')?.addEventListener('click', () => openView('view-profile'));
+    document.getElementById('btnNavSettings')?.addEventListener('click', () => openView('view-settings'));
 
     // Quick Picks
     document.querySelectorAll('.recent-card').forEach(card => {

@@ -23,9 +23,9 @@
                 <header class="top-header">
                     <h2 id="greetingText">Good afternoon</h2>
                     <div class="header-icons">
-                        <i class="fa-regular fa-bell"></i>
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        <i class="fa-solid fa-gear"></i>
+                        <i class="fa-regular fa-bell" id="btnNavNotifications"></i>
+                        <i class="fa-regular fa-user" id="btnNavProfile"></i>
+                        <i class="fa-solid fa-gear" id="btnNavSettings"></i>
                     </div>
                 </header>
                 
@@ -148,6 +148,117 @@
                             <h4>Liked Songs</h4>
                             <p><span id="likedCount">0</span> songs</p>
                         </div>
+                    </div>
+                </div>
+            </section>
+            <!-- PROFILE VIEW -->
+            <section id="view-profile" class="view-section">
+                <header class="top-header">
+                    <h2>Profile</h2>
+                </header>
+                <div class="profile-header-card">
+                    <img src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150" alt="Avatar" class="profile-avatar" id="profileAvatar">
+                    <h3 id="profileDisplayName">User</h3>
+                    <p class="text-muted" id="profileUsername">@username</p>
+                    <p class="profile-bio">Music enthusiast & Room Host 🎵</p>
+                    <div class="profile-stats">
+                        <div class="stat"><span class="val">12</span><span class="lbl">Friends</span></div>
+                        <div class="stat"><span class="val">1.2k</span><span class="lbl">Followers</span></div>
+                        <div class="stat"><span class="val">48</span><span class="lbl">Rooms</span></div>
+                    </div>
+                </div>
+                
+                <div class="section-title">Achievements</div>
+                <div class="achievements-scroll">
+                    <div class="badge-card"><i class="fa-solid fa-fire" style="color: #ff9800;"></i> 7 Day Streak</div>
+                    <div class="badge-card"><i class="fa-solid fa-crown" style="color: #ffd700;"></i> Top Host</div>
+                    <div class="badge-card"><i class="fa-solid fa-seedling" style="color: #4caf50;"></i> Early Supporter</div>
+                </div>
+
+                <div class="section-title">Favorite Genres</div>
+                <div class="filter-pills">
+                    <button class="pill">Tamil Indie</button>
+                    <button class="pill">LoFi</button>
+                    <button class="pill">Synthwave</button>
+                </div>
+            </section>
+
+            <!-- NOTIFICATIONS VIEW -->
+            <section id="view-notifications" class="view-section">
+                <header class="top-header">
+                    <h2>Notifications</h2>
+                    <i class="fa-solid fa-check-double text-muted"></i>
+                </header>
+                <div class="notifications-list">
+                    <div class="notification-item unread">
+                        <i class="fa-solid fa-user-plus icon-blue"></i>
+                        <div class="noti-text">
+                            <p><strong>Rahul</strong> accepted your friend request.</p>
+                            <span class="time">2m ago</span>
+                        </div>
+                    </div>
+                    <div class="notification-item unread">
+                        <i class="fa-solid fa-satellite-dish icon-green"></i>
+                        <div class="noti-text">
+                            <p><strong>Sai</strong> started an Audio Room.</p>
+                            <span class="time">10m ago</span>
+                        </div>
+                    </div>
+                    <div class="notification-item">
+                        <i class="fa-solid fa-music icon-purple"></i>
+                        <div class="noti-text">
+                            <p>New song added to <strong>LoFi Chill</strong> queue.</p>
+                            <span class="time">1h ago</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS VIEW -->
+            <section id="view-settings" class="view-section">
+                <header class="top-header">
+                    <h2>Settings</h2>
+                </header>
+                
+                <div class="settings-group">
+                    <div class="settings-group-title">Account</div>
+                    <div class="setting-item">
+                        <span>Edit Profile</span>
+                        <i class="fa-solid fa-chevron-right text-muted"></i>
+                    </div>
+                    <div class="setting-item">
+                        <span>Language</span>
+                        <span class="text-muted">English <i class="fa-solid fa-chevron-right"></i></span>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">Appearance</div>
+                    <div class="setting-item">
+                        <span>Dynamic Glass Effects</span>
+                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting-item">
+                        <span>AMOLED Dark Mode</span>
+                        <label class="switch"><input type="checkbox"><span class="slider round"></span></label>
+                    </div>
+                </div>
+
+                <div class="settings-group">
+                    <div class="settings-group-title">Music</div>
+                    <div class="setting-item">
+                        <span>High Quality Audio</span>
+                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                    </div>
+                    <div class="setting-item">
+                        <span>Gapless Playback</span>
+                        <label class="switch"><input type="checkbox" checked><span class="slider round"></span></label>
+                    </div>
+                </div>
+                
+                <div class="settings-group" style="margin-bottom: 40px; text-align: center; color: #e91e63;">
+                    <div class="setting-item" style="justify-content: center;">
+                        <span>Logout</span>
                     </div>
                 </div>
             </section>
