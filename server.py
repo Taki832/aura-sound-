@@ -303,6 +303,9 @@ async def websocket_room_handler(request):
         if user_name in room['members']:
             room['members'].remove(user_name)
         print(f"[WebSocket] User '{user_name}' left Sync Room #{room_code}")
+        # Broadcast member list update & automatic host transfer to next member
+        if room['sockets']:
+            await broadcast_room_state(room_code, room)
 
     return ws
 
@@ -435,6 +438,85 @@ async def api_update_profile_handler(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
+# --- FRIENDS API ---
+async def api_search_users_handler(request):
+    q = request.query.get('q', '').strip()
+    user_id = request.query.get('user_id')
+    users = await db.search_users(q, user_id)
+    return web.json_response({'users': users})
+
+async def api_friend_request_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    friend_id = data.get('friend_id')
+    success, msg = await db.send_friend_request(user_id, friend_id)
+    return web.json_response({'success': success, 'message': msg})
+
+async def api_friend_accept_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    friend_id = data.get('friend_id')
+    success = await db.accept_friend_request(user_id, friend_id)
+    return web.json_response({'success': success})
+
+async def api_friend_reject_handler(request):
+    data = await request.json()
+    user_id = data.get('user_id')
+    friend_id = data.get('friend_id')
+    success = await db.reject_friend_request(user_id, friend_id)
+    return web.json_response({'success': success})
+
+async def api_friends_list_handler(request):
+    user_id = request.query.get('user_id')
+    friends = await db.get_friends_list(user_id)
+    requests = await db.get_friend_requests(user_id)
+    return web.json_response({'friends': friends, 'requests': requests})
+
+# --- NOTIFICATIONS API ---
+async def api_notifications_list_handler(request):
+    user_id = request.query.get('user_id')
+    notifications = await db.get_notifications(user_id)
+    return web.json_response({'notifications': notifications})
+
+async def api_notification_read_handler(request):
+    data = await request.json()
+    notif_id = data.get('notif_id')
+    user_id = data.get('user_id')
+    await db.mark_notification_read(notif_id, user_id)
+    return web.json_response({'success': True})
+
+# --- PLAYLISTS & LIKED SONGS API ---
+async def api_playlists_create_handler(request):
+    data = await request.json()
+    playlist_id = await db.create_playlist(
+        data.get('user_id'),
+        data.get('name'),
+        data.get('description', ''),
+        data.get('cover_image', ''),
+        data.get('is_public', 1)
+    )
+    return web.json_response({'playlist_id': playlist_id})
+
+async def api_playlists_list_handler(request):
+    user_id = request.query.get('user_id')
+    playlists = await db.get_user_playlists(user_id)
+    return web.json_response({'playlists': playlists})
+
+async def api_playlists_add_track_handler(request):
+    data = await request.json()
+    success, msg = await db.add_track_to_playlist(data.get('playlist_id'), data.get('user_id'), data.get('track'))
+    return web.json_response({'success': success, 'message': msg})
+
+async def api_liked_toggle_handler(request):
+    data = await request.json()
+    is_liked, msg = await db.toggle_liked_song(data.get('user_id'), data.get('track'))
+    return web.json_response({'is_liked': is_liked, 'message': msg})
+
+async def api_liked_list_handler(request):
+    user_id = request.query.get('user_id')
+    tracks = await db.get_liked_songs(user_id)
+    return web.json_response({'tracks': tracks})
+
 # ─── Web Application Setup & Middleware ─────────────────────────────────────────
 @web.middleware
 async def ngrok_skip_warning_middleware(request, handler):
@@ -450,6 +532,25 @@ def setup_web_app(app):
     app.router.add_post('/api/room/create', api_create_room_handler)
     app.router.add_post('/api/auth', api_auth_handler)
     app.router.add_post('/api/profile/update', api_update_profile_handler)
+    
+    # Friends
+    app.router.add_get('/api/users/search', api_search_users_handler)
+    app.router.add_post('/api/friends/request', api_friend_request_handler)
+    app.router.add_post('/api/friends/accept', api_friend_accept_handler)
+    app.router.add_post('/api/friends/reject', api_friend_reject_handler)
+    app.router.add_get('/api/friends/list', api_friends_list_handler)
+
+    # Notifications
+    app.router.add_get('/api/notifications/list', api_notifications_list_handler)
+    app.router.add_post('/api/notifications/read', api_notification_read_handler)
+
+    # Playlists & Liked Songs
+    app.router.add_post('/api/playlists/create', api_playlists_create_handler)
+    app.router.add_get('/api/playlists/list', api_playlists_list_handler)
+    app.router.add_post('/api/playlists/add_track', api_playlists_add_track_handler)
+    app.router.add_post('/api/liked/toggle', api_liked_toggle_handler)
+    app.router.add_get('/api/liked/list', api_liked_list_handler)
+
     app.router.add_get('/ws/room/{room_code}', websocket_room_handler)
 
     web_app_dir = os.path.join(os.path.dirname(__file__), 'web')

@@ -111,6 +111,12 @@ document.addEventListener("DOMContentLoaded", async () => {
                             document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
                         }
                     } catch(e) {}
+
+                    // Load User Data
+                    loadFriendsList();
+                    loadNotificationsList();
+                    loadPlaylistsList();
+                    loadLikedSongsList();
                 }
             } catch (e) {
                 console.error("Auth failed", e);
@@ -750,4 +756,67 @@ function setupEditProfile() {
         }
         saveBtn.textContent = 'Save Changes';
     });
+}
+
+// --- FRIENDS, NOTIFICATIONS & PLAYLISTS LOADERS ---
+async function loadFriendsList() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/friends/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        if (data.friends) {
+            document.getElementById('profileFriendsCount').textContent = data.friends.length;
+        }
+    } catch(e) {}
+}
+
+async function loadNotificationsList() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/notifications/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        const listEl = document.getElementById('notificationsList');
+        if (listEl && data.notifications && data.notifications.length > 0) {
+            listEl.innerHTML = data.notifications.map(n => `
+                <div class="notification-item ${n.is_read ? 'read' : 'unread'}" style="padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; font-size: 14px;">${n.title}</div>
+                        <div class="text-muted" style="font-size: 13px;">${n.message}</div>
+                    </div>
+                    ${!n.is_read ? `<button onclick="markRead(${n.id})" class="secondary-btn" style="padding: 4px 10px; font-size: 12px;">Mark Read</button>` : ''}
+                </div>
+            `).join('');
+        }
+    } catch(e) {}
+}
+
+async function markRead(notifId) {
+    if (!currentUser) return;
+    await fetch('/api/notifications/read', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ notif_id: notifId, user_id: currentUser.id })
+    });
+    loadNotificationsList();
+}
+
+async function loadPlaylistsList() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/playlists/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        console.log("Playlists loaded:", data.playlists);
+    } catch(e) {}
+}
+
+async function loadLikedSongsList() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/liked/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        if (data.tracks) {
+            const countEl = document.getElementById('likedCount');
+            if (countEl) countEl.textContent = data.tracks.length;
+        }
+    } catch(e) {}
 }
