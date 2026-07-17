@@ -31,19 +31,25 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
 
-# ─── Telegram Bot Credentials & WebApp Config ─────────────────────────
-API_ID          = 28640193
-API_HASH        = "f21327975cce7fb1e9c0fd9d72e0812a"
-TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"  # @Crazycando_bot
-TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"  # @Taki832_bot
-MINI_APP_URL    = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
+try:
+    from pyrogram import Client, filters
+    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+    
+    # ─── Telegram Bot Credentials & WebApp Config ─────────────────────────
+    API_ID          = 28640193
+    API_HASH        = "f21327975cce7fb1e9c0fd9d72e0812a"
+    TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"  # @Crazycando_bot
+    TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"  # @Taki832_bot
 
-SESSION_DIR = "."
-python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
-mojo_bot   = Client(os.path.join(SESSION_DIR, "mojo_bot_session"),   api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
+    SESSION_DIR = "."
+    python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
+    mojo_bot = Client(os.path.join(SESSION_DIR, "mojo_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
+    BOTS_ENABLED = True
+except ImportError:
+    print("[Notice] Pyrogram module not installed. Running Web Server in standalone mode.")
+    BOTS_ENABLED = False
 
 # ─── Global Server-Driven Room State ─────────────────────────────────────────
 sync_rooms = {}
@@ -51,20 +57,21 @@ ROOM_CODE_PATTERN = re.compile(r"^[A-Z0-9-]{3,64}$")
 YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,32}$")
 
 # ─── Telegram Bot Handlers ─────────────────────────────────────────────────────
-@python_bot.on_message(filters.command("start") | filters.command("app"))
-@mojo_bot.on_message(filters.command("start") | filters.command("app"))
-async def send_mini_app_button(client, message):
-    user_name = message.from_user.first_name if message.from_user else "Vishnu"
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚀 Open AuraSound AI Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
-        [InlineKeyboardButton("🌐 Open in Browser", url=MINI_APP_URL)]
-    ])
-    await message.reply_text(
-        f"👋 **Welcome, {user_name}!**\n\n"
-        "🎬 **AuraSound.AI — Audio & Video Sync Room**\n"
-        "Tap the button below to launch the Mini App inside Telegram, listen to music or watch YouTube video songs live with friends!",
-        reply_markup=keyboard
-    )
+if BOTS_ENABLED:
+    @python_bot.on_message(filters.command("start") | filters.command("app"))
+    @mojo_bot.on_message(filters.command("start") | filters.command("app"))
+    async def send_mini_app_button(client, message):
+        user_name = message.from_user.first_name if message.from_user else "Vishnu"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Open AuraSound AI Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
+            [InlineKeyboardButton("🌐 Open in Browser", url=MINI_APP_URL)]
+        ])
+        await message.reply_text(
+            f"👋 **Welcome, {user_name}!**\n\n"
+            "🎬 **AuraSound.AI — Audio & Video Sync Room**\n"
+            "Tap the button below to launch the Mini App inside Telegram, listen to music or watch YouTube video songs live with friends!",
+            reply_markup=keyboard
+        )
 
 # ─── Multi-Source Extraction Helpers ────────────────────────────────────────────
 def multi_source_search(query: str, source: str = 'all', limit: int = 6):
@@ -686,15 +693,19 @@ async def main():
     print("[0/5] Initializing Database...")
     await db.init_db()
 
-    print("[1/5] Starting Telegram Bots...")
-    await python_bot.start()
-    await mojo_bot.start()
+    if BOTS_ENABLED:
+        try:
+            print("[1/5] Starting Telegram Bots...")
+            await python_bot.start()
+            await mojo_bot.start()
+        except Exception as e:
+            print(f"[Telegram Bot Startup Skipped] {e}")
 
     print("[2/4] Spawning Server Heartbeat Sync Loop...")
     asyncio.create_task(room_heartbeat_loop())
 
     print("[3/5] Setting Up Web App Routes...")
-    app = web.Application(middlewares=[ngrok_skip_warning_middleware])
+    app = web.Application(middlewares=[security_and_rate_limit_middleware])
     setup_web_app(app)
 
     port = int(os.environ.get('PORT', 8000))
