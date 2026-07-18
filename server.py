@@ -52,9 +52,8 @@ if os.environ.get("ENABLE_BOTS", "1") == "1":
         TOKEN_PYTHON    = "8045450869:AAEPoFX1EkqY8ENOk1yiia4sbv8AmBBjdhg"
         TOKEN_MOJO      = "8012607564:AAEQpYlPnXmhIIS2PFv4q3YXp0GGY2MdW2U"
 
-        SESSION_DIR = "."
-        python_bot = Client(os.path.join(SESSION_DIR, "python_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON)
-        mojo_bot = Client(os.path.join(SESSION_DIR, "mojo_bot_session"), api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO)
+        python_bot = Client("python_bot_mem", api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_PYTHON, in_memory=True)
+        mojo_bot = Client("mojo_bot_mem", api_id=API_ID, api_hash=API_HASH, bot_token=TOKEN_MOJO, in_memory=True)
         BOTS_ENABLED = True
     except ImportError:
         print("[Notice] Pyrogram not installed. Bots disabled.")
