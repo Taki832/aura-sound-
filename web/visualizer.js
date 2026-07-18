@@ -39,8 +39,9 @@ class AudioVisualizer {
         this.ctx.clearRect(0, 0, width, height);
 
         for (let i = 0; i < this.bars; i++) {
-            // Simulate beat reactivity
-            const targetHeight = Math.random() * (height * 0.8) + 10;
+            // Beat reactivity depends on actual playback
+            const isPlaying = window.isPlaying || false;
+            const targetHeight = isPlaying ? (Math.random() * (height * 0.8) + 12) : 4;
             this.values[i] += (targetHeight - this.values[i]) * 0.2;
 
             const x = i * (barWidth + 4);

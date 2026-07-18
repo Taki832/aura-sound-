@@ -5,6 +5,7 @@ let currentTrack = null;
 let isPlaying = false;
 let isVideoMode = false;
 let isLoopMode = 'none'; // 'none', 'one', 'all'
+let isShuffleMode = false;
 let userLikedTrackIds = new Set();
 let selectedTrackForPlaylist = null;
 let currentViewingPlaylist = null;
@@ -417,12 +418,25 @@ function addToQueue(track) {
 }
 
 function playNextInQueue() {
-    queueIndex++;
-    if (queueIndex < playQueue.length) {
+    if (playQueue.length === 0) {
+        if (!roomCode || isRoomHost) showToast("Queue is empty");
+        return;
+    }
+
+    if (isShuffleMode && playQueue.length > 1) {
+        let randomIndex = Math.floor(Math.random() * playQueue.length);
+        if (randomIndex === queueIndex && playQueue.length > 1) {
+            randomIndex = (randomIndex + 1) % playQueue.length;
+        }
+        queueIndex = randomIndex;
+    } else {
+        queueIndex++;
+    }
+
+    if (queueIndex < playQueue.length && queueIndex >= 0) {
         if (roomCode) {
-            // Auto play next song for the whole room if we are the host
             if (isRoomHost) {
-                playTrack(playQueue[queueIndex], false); // Defaults to audio mode when autoplaying next
+                playTrack(playQueue[queueIndex], false);
             }
         } else {
             playTrack(playQueue[queueIndex], false);
@@ -514,6 +528,15 @@ function setupPlayerControls() {
             queueIndex -= 2; // Will be incremented in playNextInQueue
             playNextInQueue();
         }
+    });
+
+    // Shuffle button listener
+    const shuffleBtn = document.getElementById('fullShuffleBtn');
+    shuffleBtn?.addEventListener('click', () => {
+        isShuffleMode = !isShuffleMode;
+        shuffleBtn.className = isShuffleMode ? "fa-solid fa-shuffle" : "fa-solid fa-shuffle text-muted";
+        shuffleBtn.style.color = isShuffleMode ? "#1DB954" : "";
+        showToast(isShuffleMode ? "Shuffle On" : "Shuffle Off");
     });
 
     // Loop button listener
@@ -726,6 +749,7 @@ function seekLocal(seconds) {
 }
 
 function updatePlayButtons() {
+    window.isPlaying = isPlaying;
     miniPlayBtn.className = isPlaying ? "fa-solid fa-pause" : "fa-solid fa-play";
     fullPlayBtn.innerHTML = isPlaying ? '<i class="fa-solid fa-pause fa-xl"></i>' : '<i class="fa-solid fa-play fa-xl" style="margin-left: 4px;"></i>';
 }
