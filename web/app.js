@@ -715,42 +715,67 @@ function applyTrackUI(track, asVideo) {
     if (miniFav) { miniFav.className = heartClass; miniFav.style.color = heartColor; }
     if (fullFav) { fullFav.className = heartClass + ' fa-xl'; fullFav.style.color = heartColor; }
 
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+
     if (asVideo) {
         fullArtEl.classList.add('hidden');
         youtubePlayerHost.classList.remove('hidden');
-        if (isYtReady) ytPlayer.loadVideoById(track.yt_id);
-        if (isHiddenYtReady) hiddenYtPlayer.stopVideo();
+        if (htmlAudio) htmlAudio.pause();
+        if (isYtReady && ytPlayer && ytPlayer.loadVideoById) ytPlayer.loadVideoById(track.yt_id);
+        if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.stopVideo) hiddenYtPlayer.stopVideo();
     } else {
         youtubePlayerHost.classList.add('hidden');
         fullArtEl.classList.remove('hidden');
-        if (isYtReady) ytPlayer.stopVideo();
-        if (isHiddenYtReady) hiddenYtPlayer.loadVideoById(track.yt_id);
+        if (isYtReady && ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
+        if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.loadVideoById) {
+            hiddenYtPlayer.loadVideoById(track.yt_id);
+        } else if (htmlAudio) {
+            htmlAudio.src = `/api/stream?q=${encodeURIComponent(track.yt_id || track.title)}`;
+            htmlAudio.play().catch(() => {});
+        }
     }
 }
 
 function getLocalPosition() {
-    if (isVideoMode && isYtReady) return ytPlayer.getCurrentTime() || 0;
-    if (!isVideoMode && isHiddenYtReady) return hiddenYtPlayer.getCurrentTime() || 0;
+    if (isVideoMode && isYtReady && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime() || 0;
+    if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.getCurrentTime) return hiddenYtPlayer.getCurrentTime() || 0;
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (htmlAudio && !htmlAudio.paused) return htmlAudio.currentTime || 0;
     return 0;
 }
 
 function playLocal() {
     isPlaying = true;
     updatePlayButtons();
-    if (isVideoMode && isYtReady) ytPlayer.playVideo();
-    else if (!isVideoMode && isHiddenYtReady) hiddenYtPlayer.playVideo();
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (isVideoMode && isYtReady && ytPlayer && ytPlayer.playVideo) {
+        if (htmlAudio) htmlAudio.pause();
+        ytPlayer.playVideo();
+    } else if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.playVideo) {
+        if (htmlAudio) htmlAudio.pause();
+        hiddenYtPlayer.playVideo();
+    } else if (htmlAudio && currentTrack) {
+        if (!htmlAudio.src || !htmlAudio.src.includes(encodeURIComponent(currentTrack.yt_id || currentTrack.title))) {
+            htmlAudio.src = `/api/stream?q=${encodeURIComponent(currentTrack.yt_id || currentTrack.title)}`;
+        }
+        htmlAudio.play().catch(e => console.log("Audio play fallback notice:", e));
+    }
 }
 
 function pauseLocal() {
     isPlaying = false;
     updatePlayButtons();
-    if (isVideoMode && isYtReady) ytPlayer.pauseVideo();
-    else if (!isVideoMode && isHiddenYtReady) hiddenYtPlayer.pauseVideo();
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (isVideoMode && isYtReady && ytPlayer && ytPlayer.pauseVideo) ytPlayer.pauseVideo();
+    if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.pauseVideo) hiddenYtPlayer.pauseVideo();
+    if (htmlAudio) htmlAudio.pause();
 }
 
 function seekLocal(seconds) {
-    if (isVideoMode && isYtReady) ytPlayer.seekTo(seconds, true);
-    else if (!isVideoMode && isHiddenYtReady) hiddenYtPlayer.seekTo(seconds, true);
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (isVideoMode && isYtReady && ytPlayer && ytPlayer.seekTo) ytPlayer.seekTo(seconds, true);
+    if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.seekTo) hiddenYtPlayer.seekTo(seconds, true);
+    if (htmlAudio) htmlAudio.currentTime = seconds;
 }
 
 function updatePlayButtons() {
