@@ -1128,35 +1128,48 @@ async def main():
     await db.init_db()
 
     if BOTS_ENABLED:
-        try:
-            print("[1/5] Starting Telegram Bots (10s timeout)...")
-            await asyncio.wait_for(python_bot.start(), timeout=10)
-            await asyncio.wait_for(mojo_bot.start(), timeout=10)
-
-            # Register Bot Commands for Telegram GUI popup menu
-            commands_list = [
-                BotCommand("start", "🚀 Launch AuraSound AI Mini App"),
-                BotCommand("app", "🚀 Launch AuraSound AI Mini App"),
-                BotCommand("room", "🎬 Join or Invite to Sync Room"),
-                BotCommand("nowplaying", "🎶 Currently Playing Songs"),
-                BotCommand("playlists", "📁 View Saved Playlists"),
-                BotCommand("history", "📜 Listening & Search History"),
-                BotCommand("friends", "👥 Friends & Network"),
-                BotCommand("search", "🔍 Search Live Music"),
-                BotCommand("help", "🤖 Command Menu & Guide")
-            ]
+        bot_started = False
+        for attempt in range(3):
             try:
-                await python_bot.set_my_commands(commands_list)
-                await mojo_bot.set_my_commands(commands_list)
-                print("  ✓ Registered Telegram Command Popup Menus")
-            except Exception as cmd_e:
-                print(f"  ⚠ Command registration notice: {cmd_e}")
+                print(f"[1/5] Starting Telegram Bots (attempt {attempt+1}/3, 15s timeout)...")
+                await asyncio.wait_for(python_bot.start(), timeout=15)
+                await asyncio.wait_for(mojo_bot.start(), timeout=15)
 
-            print("  ✓ Telegram Bots connected successfully")
-        except asyncio.TimeoutError:
-            print("  ⚠ Telegram Bot startup timed out — running in web-only mode")
-        except Exception as e:
-            print(f"  ⚠ Telegram Bot Startup Skipped: {e}")
+                # Register Bot Commands for Telegram GUI popup menu
+                commands_list = [
+                    BotCommand("start", "Launch AuraSound AI Mini App"),
+                    BotCommand("app", "Launch AuraSound AI Mini App"),
+                    BotCommand("room", "Join or Invite to Sync Room"),
+                    BotCommand("nowplaying", "Currently Playing Songs"),
+                    BotCommand("playlists", "View Saved Playlists"),
+                    BotCommand("history", "Listening & Search History"),
+                    BotCommand("friends", "Friends & Network"),
+                    BotCommand("search", "Search Live Music"),
+                    BotCommand("help", "Command Menu & Guide")
+                ]
+                try:
+                    await python_bot.set_my_commands(commands_list)
+                    await mojo_bot.set_my_commands(commands_list)
+                    print("  ✓ Registered Telegram Command Popup Menus")
+                except Exception as cmd_e:
+                    print(f"  ⚠ Command registration notice: {cmd_e}")
+
+                py_me = await python_bot.get_me()
+                mojo_me = await mojo_bot.get_me()
+                print(f"  ✓ Python Bot: @{py_me.username} (ID: {py_me.id})")
+                print(f"  ✓ Mojo Bot: @{mojo_me.username} (ID: {mojo_me.id})")
+                bot_started = True
+                break
+            except asyncio.TimeoutError:
+                print(f"  ⚠ Bot startup timed out on attempt {attempt+1}")
+                if attempt < 2:
+                    await asyncio.sleep(2)
+            except Exception as e:
+                print(f"  ⚠ Bot startup error on attempt {attempt+1}: {e}")
+                if attempt < 2:
+                    await asyncio.sleep(2)
+        if not bot_started:
+            print("  ❌ Telegram Bots failed after 3 attempts — running in web-only mode")
     else:
         print("[1/5] Telegram Bots disabled (pyrogram not installed)")
 

@@ -771,12 +771,46 @@ function playLocal() {
         if (htmlAudio) htmlAudio.pause();
         hiddenYtPlayer.playVideo();
     } else if (htmlAudio && currentTrack) {
-        if (!htmlAudio.src || !htmlAudio.src.includes(encodeURIComponent(currentTrack.yt_id || currentTrack.title))) {
-            htmlAudio.src = `/api/stream?q=${encodeURIComponent(currentTrack.yt_id || currentTrack.title)}`;
+        // HTML5 Audio fallback — fetch the real stream URL from the API
+        const trackKey = currentTrack.yt_id || currentTrack.title;
+        if (!htmlAudio.dataset.loadedTrack || htmlAudio.dataset.loadedTrack !== trackKey) {
+            htmlAudio.dataset.loadedTrack = trackKey;
+            fetch(`/api/stream?q=${encodeURIComponent(trackKey)}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.stream_url) {
+                        htmlAudio.src = d.stream_url;
+                        htmlAudio.play().catch(e => console.log("Audio play fallback:", e));
+                    } else {
+                        console.log("No stream_url returned from /api/stream");
+                    }
+                }).catch(e => console.log("Stream fetch error:", e));
+        } else {
+            htmlAudio.play().catch(e => console.log("Audio play fallback:", e));
         }
-        htmlAudio.play().catch(e => console.log("Audio play fallback notice:", e));
     }
 }
+
+// Attach ended + timeupdate handlers to htmlAudioFallback once
+(function initHtmlAudioHandlers() {
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (!htmlAudio) return;
+    htmlAudio.addEventListener('ended', () => {
+        handleTrackEnded();
+    });
+    htmlAudio.addEventListener('timeupdate', () => {
+        if (!currentTrack || isVideoMode) return;
+        if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.getPlayerState && hiddenYtPlayer.getPlayerState() === 1) return;
+        const pos = htmlAudio.currentTime || 0;
+        if (!seekSlider.matches(':active')) {
+            seekSlider.value = pos;
+            timeCurrent.textContent = formatTime(pos);
+            const percent = currentTrack.duration ? (pos / currentTrack.duration) * 100 : 0;
+            miniProgressFill.style.width = `${percent}%`;
+        }
+    });
+})();
+
 
 function pauseLocal() {
     isPlaying = false;
