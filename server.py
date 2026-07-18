@@ -31,7 +31,7 @@ try:
 except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
-MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
+MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://aura-sound-88gw.onrender.com")
 
 # Telegram bots are active by default (set ENABLE_BOTS=0 to disable)
 BOTS_ENABLED = False
