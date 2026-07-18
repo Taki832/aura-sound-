@@ -327,7 +327,8 @@ if BOTS_ENABLED:
 
         text = f"🎵 **Search Results for '{query}':**\n\n"
         for idx, t in enumerate(results, 1):
-            dur = formatTime(t.get('duration', 0))
+            d_sec = int(t.get('duration', 0))
+            dur = f"{d_sec // 60}:{d_sec % 60:02d}"
             text += f"{idx}. **{t['title']}** ({dur})\n"
 
         keyboard = InlineKeyboardMarkup([
