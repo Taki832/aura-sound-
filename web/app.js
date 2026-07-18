@@ -716,6 +716,16 @@ function applyTrackUI(track, asVideo) {
     if (fullFav) { fullFav.className = heartClass + ' fa-xl'; fullFav.style.color = heartColor; }
 
     const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (htmlAudio && !htmlAudio._hasErrorListener) {
+        htmlAudio._hasErrorListener = true;
+        htmlAudio.addEventListener('error', () => {
+            console.log("[Audio Engine] HTML5 stream error, falling back to YouTube Player...");
+            if (currentTrack && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.loadVideoById) {
+                hiddenYtPlayer.loadVideoById(currentTrack.yt_id);
+                hiddenYtPlayer.playVideo();
+            }
+        });
+    }
 
     if (asVideo) {
         fullArtEl.classList.add('hidden');
@@ -730,8 +740,14 @@ function applyTrackUI(track, asVideo) {
         if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.loadVideoById) {
             hiddenYtPlayer.loadVideoById(track.yt_id);
         } else if (htmlAudio) {
-            htmlAudio.src = `/api/stream?q=${encodeURIComponent(track.yt_id || track.title)}`;
-            htmlAudio.play().catch(() => {});
+            fetch(`/api/stream?q=${encodeURIComponent(track.yt_id || track.title)}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.stream_url) {
+                        htmlAudio.src = d.stream_url;
+                        htmlAudio.play().catch(() => {});
+                    }
+                }).catch(() => {});
         }
     }
 }

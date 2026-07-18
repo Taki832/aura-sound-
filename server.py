@@ -436,17 +436,22 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
 
 def get_direct_stream_url(query: str):
     opts = {
-        'format': 'bestaudio/best', 
+        'format': 'bestaudio[ext=m4a]/bestaudio/best', 
         'noplaylist': True, 
         'quiet': True, 
         'no_warnings': True,
-        'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+        'extract_flat': False,
+        'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']}}
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         try:
-            info = ydl.extract_info(f"ytsearch:{query}", download=False)
-            if info and info.get('entries'):
-                v = info['entries'][0]
+            target = f"https://www.youtube.com/watch?v={query}" if YOUTUBE_ID_PATTERN.fullmatch(query) else f"ytsearch:{query}"
+            info = ydl.extract_info(target, download=False)
+            if info:
+                if info.get('entries') and len(info['entries']) > 0:
+                    v = info['entries'][0]
+                else:
+                    v = info
                 return v.get('url'), v.get('title'), v.get('thumbnail', ''), v.get('duration', 0)
         except Exception as e:
             print(f"[Direct Audio Stream Error] {e}")
