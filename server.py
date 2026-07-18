@@ -605,6 +605,16 @@ async def api_playlists_add_track_handler(request):
     success, msg = await db.add_track_to_playlist(data.get('playlist_id'), data.get('user_id'), data.get('track'))
     return web.json_response({'success': success, 'message': msg})
 
+async def api_playlists_remove_track_handler(request):
+    data = await request.json()
+    success, msg = await db.remove_track_from_playlist(data.get('playlist_id'), data.get('user_id'), data.get('index'))
+    return web.json_response({'success': success, 'message': msg})
+
+async def api_playlists_delete_handler(request):
+    data = await request.json()
+    success, msg = await db.delete_playlist(data.get('playlist_id'), data.get('user_id'))
+    return web.json_response({'success': success, 'message': msg})
+
 async def api_liked_toggle_handler(request):
     data = await request.json()
     is_liked, msg = await db.toggle_liked_song(data.get('user_id'), data.get('track'))
@@ -764,6 +774,8 @@ def setup_web_app(app):
     app.router.add_post('/api/playlists/create', api_playlists_create_handler)
     app.router.add_get('/api/playlists/list', api_playlists_list_handler)
     app.router.add_post('/api/playlists/add_track', api_playlists_add_track_handler)
+    app.router.add_post('/api/playlists/remove_track', api_playlists_remove_track_handler)
+    app.router.add_post('/api/playlists/delete', api_playlists_delete_handler)
     app.router.add_post('/api/liked/toggle', api_liked_toggle_handler)
     app.router.add_get('/api/liked/list', api_liked_list_handler)
 

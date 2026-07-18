@@ -340,7 +340,11 @@
                     <h2 id="fullTitle" class="marquee"><span>Song Title</span></h2>
                     <p id="fullArtist">Artist Name</p>
                 </div>
-                <i class="fa-regular fa-heart fa-xl" id="fullFavBtn"></i>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fa-regular fa-heart fa-xl" id="fullFavBtn" style="cursor:pointer;" title="Like Song"></i>
+                    <i class="fa-solid fa-folder-plus fa-xl" id="fullAddPlaylistBtn" style="cursor:pointer;" title="Add to Playlist"></i>
+                    <i class="fa-solid fa-film fa-xl text-muted" id="fullVideoToggleBtn" style="cursor:pointer;" title="Toggle Video/Audio"></i>
+                </div>
             </div>
 
             <div class="full-player-scrubber">
@@ -358,7 +362,7 @@
                     <i class="fa-solid fa-play fa-xl" style="margin-left: 4px;"></i>
                 </div>
                 <i class="fa-solid fa-forward-step fa-2x" id="fullNextBtn"></i>
-                <i class="fa-solid fa-repeat text-muted"></i>
+                <i class="fa-solid fa-repeat text-muted" id="fullLoopBtn" style="cursor:pointer; transition: all 0.2s;" title="Toggle Repeat Mode"></i>
             </div>
 
             <div class="full-player-footer">
@@ -425,6 +429,40 @@
             </div>
             <div class="cropper-container" style="width: 100%; height: calc(100% - 70px);">
                 <img id="cropperImage" style="max-width: 100%; display: block;">
+            </div>
+        </div>
+
+        <!-- Add to Playlist Modal -->
+        <div id="addToPlaylistModal" class="full-player-overlay hidden" style="z-index: 9999; background: rgba(18,18,18,0.95); backdrop-filter: blur(20px);">
+            <div class="full-player-header">
+                <i class="fa-solid fa-xmark fa-xl" id="closeAddToPlaylistBtn" style="cursor:pointer;"></i>
+                <div class="header-title">Add to Playlist</div>
+                <div style="width: 24px;"></div>
+            </div>
+            <div style="padding: 20px; overflow-y: auto; height: calc(100% - 70px);">
+                <div id="selectPlaylistsList" style="display: flex; flex-direction: column; gap: 12px;"></div>
+            </div>
+        </div>
+
+        <!-- Playlist Detail View Modal -->
+        <div id="playlistDetailModal" class="full-player-overlay hidden" style="z-index: 9998; background: rgba(18,18,18,0.98); backdrop-filter: blur(20px);">
+            <div class="full-player-header">
+                <i class="fa-solid fa-arrow-left fa-xl" id="closePlaylistDetailBtn" style="cursor:pointer;"></i>
+                <div class="header-title" id="playlistDetailTitle">Playlist</div>
+                <i class="fa-solid fa-trash fa-xl" id="deletePlaylistBtn" style="color:#e91e63; cursor:pointer;" title="Delete Playlist"></i>
+            </div>
+            <div style="padding: 20px; overflow-y: auto; height: calc(100% - 70px);">
+                <div class="playlist-header-card" style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px;">
+                    <div style="width: 80px; height: 80px; background: linear-gradient(135deg,#450AF5,#8E8EE5); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 32px; color: #fff;">
+                        <i class="fa-solid fa-music"></i>
+                    </div>
+                    <div>
+                        <h2 id="playlistDetailName" style="font-size: 20px; font-weight: 700; margin-bottom: 4px;">My Playlist</h2>
+                        <p id="playlistDetailSub" class="text-muted" style="font-size: 13px;">0 tracks</p>
+                        <button id="btnPlayAllPlaylist" class="primary-btn" style="margin-top: 8px; padding: 6px 16px; font-size: 13px; border-radius: 20px;"><i class="fa-solid fa-play" style="margin-right:6px;"></i> Play All</button>
+                    </div>
+                </div>
+                <div id="playlistTrackList" class="track-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
             </div>
         </div>
 

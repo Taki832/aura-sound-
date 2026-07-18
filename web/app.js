@@ -4,6 +4,10 @@
 let currentTrack = null;
 let isPlaying = false;
 let isVideoMode = false;
+let isLoopMode = 'none'; // 'none', 'one', 'all'
+let userLikedTrackIds = new Set();
+let selectedTrackForPlaylist = null;
+let currentViewingPlaylist = null;
 let favorites = JSON.parse(localStorage.getItem('aurasound_favs')) || [];
 let activeSource = 'all';
 let currentUser = null;
@@ -65,70 +69,92 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupEditProfile();
     setupLibrary();
     
-    // Setup Telegram WebApp
+    // Setup User Auth (Telegram WebApp or Browser Guest Fallback)
+    let authUser = null;
     if (window.Telegram && window.Telegram.WebApp) {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         window.Telegram.WebApp.setHeaderColor('#121212');
-        const user = window.Telegram.WebApp.initDataUnsafe?.user;
-        if (user) {
-            // Time-aware greeting
-            const hour = new Date().getHours();
-            let greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-            document.getElementById('greetingText').textContent = `${greeting}, ${user.first_name}`;
-            
-            // Authenticate with backend
-            try {
-                const res = await fetch('/api/auth', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: user })
-                });
-                const authData = await res.json();
-                if (authData.user) {
-                    currentUser = authData.user;
-                    console.log("Authenticated as:", currentUser.username || currentUser.display_name);
-                    
-                    // Populate Profile View
-                    document.getElementById('profileDisplayName').textContent = currentUser.display_name || "User";
-                    document.getElementById('profileUsername').textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
-                    document.getElementById('profileBio').textContent = currentUser.bio || "No bio added.";
-                    if (currentUser.avatar_url) {
-                        document.getElementById('profileAvatar').src = currentUser.avatar_url;
-                    }
-                    if (currentUser.banner_url) {
-                        document.getElementById('profileBannerImg').src = currentUser.banner_url;
-                    }
-                    if (currentUser.theme === 'light') {
-                        document.body.classList.add('light-theme');
-                    }
-                    
-                    // Apply Settings
-                    try {
-                        const settings = JSON.parse(currentUser.settings_json || '{}');
-                        document.getElementById('settingAmoled').checked = settings.amoled || false;
-                        document.getElementById('settingGapless').checked = settings.gapless !== false;
-                        document.getElementById('settingHqAudio').checked = settings.hqAudio !== false;
-                        document.getElementById('settingGlassEffects').checked = settings.glassEffects !== false;
-                        
-                        if(settings.amoled) document.body.style.backgroundColor = '#000000';
-                        if(settings.glassEffects === false) {
-                            document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
-                        }
-                    } catch(e) {}
+        authUser = window.Telegram.WebApp.initDataUnsafe?.user;
+    }
+    
+    if (!authUser) {
+        let storedGuest = localStorage.getItem('aurasound_guest_user');
+        if (storedGuest) {
+            try { authUser = JSON.parse(storedGuest); } catch(e) {}
+        }
+        if (!authUser) {
+            const guestId = Math.floor(Math.random() * 899999999) + 100000000;
+            authUser = {
+                id: guestId,
+                username: `listener_${guestId % 1000}`,
+                first_name: 'Listener'
+            };
+            localStorage.setItem('aurasound_guest_user', JSON.stringify(authUser));
+        }
+    }
 
-                    // Load User Data
-                    loadFriendsList();
-                    loadNotificationsList();
-                    loadPlaylistsList();
-                    loadLikedSongsList();
-                    loadListeningHistory();
-                    loadUserStats();
-                    loadSearchHistory();
+    if (authUser) {
+        // Time-aware greeting
+        const hour = new Date().getHours();
+        let greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+        const greetingEl = document.getElementById('greetingText');
+        if (greetingEl) greetingEl.textContent = `${greeting}, ${authUser.first_name || 'Listener'}`;
+        
+        // Authenticate with backend
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user: authUser })
+            });
+            const authData = await res.json();
+            if (authData.user) {
+                currentUser = authData.user;
+                console.log("Authenticated as:", currentUser.username || currentUser.display_name);
+                
+                // Populate Profile View
+                const disp = document.getElementById('profileDisplayName');
+                const uname = document.getElementById('profileUsername');
+                const bio = document.getElementById('profileBio');
+                if (disp) disp.textContent = currentUser.display_name || "User";
+                if (uname) uname.textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
+                if (bio) bio.textContent = currentUser.bio || "No bio added.";
+                if (currentUser.avatar_url && document.getElementById('profileAvatar')) {
+                    document.getElementById('profileAvatar').src = currentUser.avatar_url;
                 }
-            } catch (e) {
-                console.error("Auth failed", e);
+                if (currentUser.banner_url && document.getElementById('profileBannerImg')) {
+                    document.getElementById('profileBannerImg').src = currentUser.banner_url;
+                }
+                if (currentUser.theme === 'light') {
+                    document.body.classList.add('light-theme');
+                }
+                
+                // Apply Settings
+                try {
+                    const settings = JSON.parse(currentUser.settings_json || '{}');
+                    if (document.getElementById('settingAmoled')) document.getElementById('settingAmoled').checked = settings.amoled || false;
+                    if (document.getElementById('settingGapless')) document.getElementById('settingGapless').checked = settings.gapless !== false;
+                    if (document.getElementById('settingHqAudio')) document.getElementById('settingHqAudio').checked = settings.hqAudio !== false;
+                    if (document.getElementById('settingGlassEffects')) document.getElementById('settingGlassEffects').checked = settings.glassEffects !== false;
+                    
+                    if(settings.amoled) document.body.style.backgroundColor = '#000000';
+                    if(settings.glassEffects === false) {
+                        document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
+                    }
+                } catch(e) {}
+
+                // Load User Data
+                loadFriendsList();
+                loadNotificationsList();
+                loadPlaylistsList();
+                loadLikedSongsList();
+                loadListeningHistory();
+                loadUserStats();
+                loadSearchHistory();
             }
+        } catch (e) {
+            console.error("Auth failed", e);
         }
     }
 });
@@ -156,6 +182,18 @@ window.onYouTubeIframeAPIReady = function() {
     });
 };
 
+function handleTrackEnded() {
+    if (isLoopMode === 'one') {
+        seekLocal(0);
+        playLocal();
+    } else if (isLoopMode === 'all' && queueIndex >= playQueue.length - 1 && playQueue.length > 0) {
+        queueIndex = -1;
+        playNextInQueue();
+    } else {
+        playNextInQueue();
+    }
+}
+
 function onYtStateChange(event) {
     if (!isVideoMode) return;
     if (event.data === YT.PlayerState.PLAYING) {
@@ -165,7 +203,7 @@ function onYtStateChange(event) {
         isPlaying = false;
         updatePlayButtons();
     } else if (event.data === YT.PlayerState.ENDED) {
-        playNextInQueue();
+        handleTrackEnded();
     }
 }
 function onHiddenYtStateChange(event) {
@@ -177,7 +215,7 @@ function onHiddenYtStateChange(event) {
         isPlaying = false;
         updatePlayButtons();
     } else if (event.data === YT.PlayerState.ENDED) {
-        playNextInQueue();
+        handleTrackEnded();
     }
 }
 
@@ -336,6 +374,7 @@ async function performSearch(query) {
                 </div>
                 <div class="track-actions">
                     <i class="fa-solid fa-plus add-queue-btn" title="Add to Queue"></i>
+                    <i class="fa-solid fa-folder-plus add-playlist-btn" title="Add to Playlist"></i>
                     <i class="fa-solid fa-play play-audio-btn" title="Play Audio"></i>
                     <i class="fa-solid fa-film play-video-btn" title="Play Video"></i>
                 </div>
@@ -352,6 +391,10 @@ async function performSearch(query) {
             el.querySelector('.add-queue-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 addToQueue(track);
+            });
+            el.querySelector('.add-playlist-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAddToPlaylistModal(track);
             });
             el.addEventListener('click', () => playTrack(track, false));
             resultsList.appendChild(el);
@@ -473,6 +516,41 @@ function setupPlayerControls() {
         }
     });
 
+    // Loop button listener
+    const loopBtn = document.getElementById('fullLoopBtn');
+    loopBtn?.addEventListener('click', () => {
+        if (isLoopMode === 'none') {
+            isLoopMode = 'one';
+            loopBtn.className = 'fa-solid fa-repeat';
+            loopBtn.style.color = '#1DB954';
+            showToast("Repeat Track On");
+        } else if (isLoopMode === 'one') {
+            isLoopMode = 'all';
+            loopBtn.className = 'fa-solid fa-arrows-rotate';
+            loopBtn.style.color = '#1DB954';
+            showToast("Repeat Queue On");
+        } else {
+            isLoopMode = 'none';
+            loopBtn.className = 'fa-solid fa-repeat text-muted';
+            loopBtn.style.color = '';
+            showToast("Repeat Off");
+        }
+    });
+
+    // Video toggle listener
+    document.getElementById('fullVideoToggleBtn')?.addEventListener('click', () => {
+        if (!currentTrack) return;
+        isVideoMode = !isVideoMode;
+        applyTrackUI(currentTrack, isVideoMode);
+        playLocal();
+        showToast(isVideoMode ? "Switched to Video Mode" : "Switched to Audio Mode");
+    });
+
+    // Full Player Add to Playlist button
+    document.getElementById('fullAddPlaylistBtn')?.addEventListener('click', () => {
+        if (currentTrack) openAddToPlaylistModal(currentTrack);
+    });
+
     // Update Progress Loop
     setInterval(() => {
         if (!currentTrack) return;
@@ -504,6 +582,13 @@ async function toggleLikeCurrentTrack() {
             body: JSON.stringify({ user_id: currentUser.id, track: currentTrack })
         });
         const data = await res.json();
+        const trackKey = currentTrack.yt_id || currentTrack.title;
+        if (data.is_liked) {
+            userLikedTrackIds.add(trackKey);
+        } else {
+            userLikedTrackIds.delete(trackKey);
+        }
+
         const heartClass = data.is_liked ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
         const heartColor = data.is_liked ? '#1DB954' : '';
         
@@ -528,17 +613,23 @@ async function playTrack(track, asVideo) {
     currentTrack = track;
     isVideoMode = asVideo;
     
-    // Resolve YouTube ID
-    showToast("Resolving stream...");
-    try {
-        const res = await fetch(`/api/video?q=${encodeURIComponent(track.id || track.title)}`);
-        const data = await res.json();
-        if (!data.video_id) throw new Error("No ID");
-        track.yt_id = data.video_id;
-        if (data.duration) track.duration = data.duration;
-    } catch (e) {
-        showToast("Failed to resolve stream");
-        return;
+    if (asVideo) {
+        fullPlayerOverlay.classList.add('open');
+    }
+
+    // Resolve YouTube ID if missing
+    if (!track.yt_id) {
+        showToast("Resolving stream...");
+        try {
+            const res = await fetch(`/api/video?q=${encodeURIComponent(track.yt_id || track.id || track.title)}`);
+            const data = await res.json();
+            if (!data.video_id) throw new Error("No ID");
+            track.yt_id = data.video_id;
+            if (data.duration) track.duration = data.duration;
+        } catch (e) {
+            showToast("Failed to resolve stream");
+            return;
+        }
     }
 
     if (roomCode && isRoomHost) {
@@ -555,7 +646,7 @@ async function playTrack(track, asVideo) {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({ user_id: currentUser.id, track: track })
-        }).catch(() => {});
+        }).then(() => loadListeningHistory()).catch(() => {});
     }
 }
 
@@ -579,20 +670,31 @@ function applyTrackUI(track, asVideo) {
 
     fullPlayerModeText.textContent = asVideo ? "WATCHING VIDEO" : "PLAYING AUDIO";
 
-    // Reset heart state
+    const videoToggleBtn = document.getElementById('fullVideoToggleBtn');
+    if (videoToggleBtn) {
+        videoToggleBtn.className = asVideo ? "fa-solid fa-film" : "fa-solid fa-film text-muted";
+        videoToggleBtn.style.color = asVideo ? "#1DB954" : "";
+    }
+
+    // Update heart state
+    const trackKey = track.yt_id || track.title;
+    const isLiked = userLikedTrackIds.has(trackKey);
+    const heartClass = isLiked ? 'fa-solid fa-heart' : 'fa-regular fa-heart';
+    const heartColor = isLiked ? '#1DB954' : '';
+    
     const miniFav = document.getElementById('miniFavBtn');
     const fullFav = document.getElementById('fullFavBtn');
-    if (miniFav) { miniFav.className = 'fa-regular fa-heart'; miniFav.style.color = ''; }
-    if (fullFav) { fullFav.className = 'fa-regular fa-heart fa-xl'; fullFav.style.color = ''; }
+    if (miniFav) { miniFav.className = heartClass; miniFav.style.color = heartColor; }
+    if (fullFav) { fullFav.className = heartClass + ' fa-xl'; fullFav.style.color = heartColor; }
 
     if (asVideo) {
-        fullArt.classList.add('hidden');
+        fullArtEl.classList.add('hidden');
         youtubePlayerHost.classList.remove('hidden');
         if (isYtReady) ytPlayer.loadVideoById(track.yt_id);
         if (isHiddenYtReady) hiddenYtPlayer.stopVideo();
     } else {
         youtubePlayerHost.classList.add('hidden');
-        fullArt.classList.remove('hidden');
+        fullArtEl.classList.remove('hidden');
         if (isYtReady) ytPlayer.stopVideo();
         if (isHiddenYtReady) hiddenYtPlayer.loadVideoById(track.yt_id);
     }
@@ -1045,6 +1147,35 @@ function setupLibrary() {
             showToast("Failed to create playlist");
         }
     });
+
+    // Playlist Modal Event Listeners
+    document.getElementById('closeAddToPlaylistBtn')?.addEventListener('click', () => {
+        document.getElementById('addToPlaylistModal')?.classList.add('hidden');
+    });
+    document.getElementById('closePlaylistDetailBtn')?.addEventListener('click', () => {
+        document.getElementById('playlistDetailModal')?.classList.add('hidden');
+    });
+    document.getElementById('btnPlayAllPlaylist')?.addEventListener('click', () => {
+        playPlaylistTrack(0);
+    });
+    document.getElementById('deletePlaylistBtn')?.addEventListener('click', async () => {
+        if (!currentUser || !currentViewingPlaylist) return;
+        if (!confirm(`Delete playlist "${currentViewingPlaylist.name}"?`)) return;
+        try {
+            const res = await fetch('/api/playlists/delete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ playlist_id: currentViewingPlaylist.id, user_id: currentUser.id })
+            });
+            const data = await res.json();
+            showToast(data.message || "Playlist deleted");
+            document.getElementById('playlistDetailModal').classList.add('hidden');
+            currentViewingPlaylist = null;
+            loadPlaylistsList();
+        } catch(e) {
+            showToast("Failed to delete playlist");
+        }
+    });
 }
 
 // --- Data Loaders ---
@@ -1122,6 +1253,12 @@ async function loadPlaylistsList() {
                     </div>
                 </div>
             `).join('');
+
+            container.querySelectorAll('.playlist-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    openPlaylistDetail(item.dataset.id);
+                });
+            });
         } else {
             container.innerHTML = '<div class="text-muted" style="font-size:14px;padding:8px;">No playlists yet. Create one!</div>';
         }
@@ -1134,10 +1271,188 @@ async function loadLikedSongsList() {
         const res = await fetch(`/api/liked/list?user_id=${currentUser.id}`);
         const data = await res.json();
         if (data.tracks) {
+            userLikedTrackIds.clear();
+            data.tracks.forEach(t => {
+                const key = t.yt_id || t.title;
+                if (key) userLikedTrackIds.add(key);
+            });
             const countEl = document.getElementById('likedCount');
             if (countEl) countEl.textContent = data.tracks.length;
         }
     } catch(e) {}
+}
+
+// --- Playlist Add & Detail Functions ---
+function openAddToPlaylistModal(track) {
+    if (!currentUser) return;
+    selectedTrackForPlaylist = track;
+    const modal = document.getElementById('addToPlaylistModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        renderSelectPlaylistsList();
+    }
+}
+
+async function renderSelectPlaylistsList() {
+    const listEl = document.getElementById('selectPlaylistsList');
+    if (!listEl || !currentUser) return;
+    listEl.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+
+    try {
+        const res = await fetch(`/api/playlists/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        let html = `
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                <input type="text" id="newPlaylistInputModal" class="dark-input" placeholder="Create new playlist..." style="flex:1;">
+                <button id="btnCreateNewPlaylistModal" class="primary-btn" style="padding: 8px 16px; font-size: 13px;">Create</button>
+            </div>
+        `;
+
+        if (data.playlists && data.playlists.length > 0) {
+            data.playlists.forEach(p => {
+                html += `
+                    <div class="track-item select-playlist-item" data-id="${p.id}" style="cursor:pointer; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: space-between;">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 40px; height: 40px; background: linear-gradient(135deg,#450AF5,#8E8EE5); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: #fff;">
+                                <i class="fa-solid fa-music"></i>
+                            </div>
+                            <div>
+                                <div style="font-weight: 600; font-size: 14px;">${p.name}</div>
+                                <div class="text-muted" style="font-size: 12px;">${(p.tracks || []).length} tracks</div>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-plus" style="color: var(--spotify-green);"></i>
+                    </div>
+                `;
+            });
+        } else {
+            html += '<div class="text-muted" style="font-size: 14px; text-align: center; padding: 16px;">No playlists found. Create one above!</div>';
+        }
+
+        listEl.innerHTML = html;
+
+        document.getElementById('btnCreateNewPlaylistModal')?.addEventListener('click', async () => {
+            const input = document.getElementById('newPlaylistInputModal');
+            const name = input?.value?.trim();
+            if (!name) return;
+            try {
+                const cRes = await fetch('/api/playlists/create', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ user_id: currentUser.id, name: name })
+                });
+                const cData = await cRes.json();
+                if (cData.playlist_id && selectedTrackForPlaylist) {
+                    await fetch('/api/playlists/add_track', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ playlist_id: cData.playlist_id, user_id: currentUser.id, track: selectedTrackForPlaylist })
+                    });
+                    showToast(`Added to "${name}"!`);
+                    document.getElementById('addToPlaylistModal').classList.add('hidden');
+                    loadPlaylistsList();
+                }
+            } catch(e) {
+                showToast("Failed to create playlist");
+            }
+        });
+
+        document.querySelectorAll('.select-playlist-item').forEach(item => {
+            item.addEventListener('click', async () => {
+                const playlistId = item.dataset.id;
+                try {
+                    const addRes = await fetch('/api/playlists/add_track', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ playlist_id: playlistId, user_id: currentUser.id, track: selectedTrackForPlaylist })
+                    });
+                    const addData = await addRes.json();
+                    showToast(addData.message || "Added to playlist!");
+                    document.getElementById('addToPlaylistModal').classList.add('hidden');
+                    loadPlaylistsList();
+                } catch(e) {
+                    showToast("Failed to add track");
+                }
+            });
+        });
+    } catch(e) {
+        listEl.innerHTML = '<div class="text-muted">Failed to load playlists</div>';
+    }
+}
+
+async function openPlaylistDetail(playlistId) {
+    if (!currentUser) return;
+    try {
+        const res = await fetch(`/api/playlists/list?user_id=${currentUser.id}`);
+        const data = await res.json();
+        const playlist = (data.playlists || []).find(p => p.id == playlistId);
+        if (!playlist) return;
+
+        currentViewingPlaylist = playlist;
+        document.getElementById('playlistDetailTitle').textContent = playlist.name;
+        document.getElementById('playlistDetailName').textContent = playlist.name;
+        document.getElementById('playlistDetailSub').textContent = `${(playlist.tracks || []).length} songs · ${playlist.is_public ? 'Public' : 'Private'}`;
+        
+        const modal = document.getElementById('playlistDetailModal');
+        modal.classList.remove('hidden');
+
+        renderPlaylistTracks(playlist);
+    } catch(e) {
+        showToast("Failed to load playlist details");
+    }
+}
+
+function renderPlaylistTracks(playlist) {
+    const listEl = document.getElementById('playlistTrackList');
+    if (!listEl) return;
+
+    if (!playlist.tracks || playlist.tracks.length === 0) {
+        listEl.innerHTML = '<div class="empty-search"><p class="text-muted" style="font-size: 14px;">No tracks in this playlist yet. Add songs from search!</p></div>';
+        return;
+    }
+
+    listEl.innerHTML = playlist.tracks.map((t, i) => `
+        <div class="track-item" style="display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px; flex: 1; cursor: pointer;" onclick="playPlaylistTrack(${i})">
+                <img src="${t.thumbnail || 'https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400'}" alt="Art" style="width: 40px; height: 40px; border-radius: 6px; object-fit: cover;" onerror="this.src='https://images.unsplash.com/photo-1614680376593-902f74cf0d41?w=400'">
+                <div>
+                    <div class="track-title" style="font-weight: 600; font-size: 14px;">${t.title}</div>
+                    <div class="track-meta" style="font-size: 12px;">${formatTime(t.duration)}</div>
+                </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fa-solid fa-play" style="color: var(--spotify-green); cursor: pointer;" onclick="playPlaylistTrack(${i})"></i>
+                <i class="fa-solid fa-xmark" style="color: var(--text-subdued); cursor: pointer; padding: 4px;" onclick="removeTrackFromCurrentPlaylist(${i})"></i>
+            </div>
+        </div>
+    `).join('');
+}
+
+function playPlaylistTrack(index) {
+    if (!currentViewingPlaylist || !currentViewingPlaylist.tracks) return;
+    playQueue = [...currentViewingPlaylist.tracks];
+    queueIndex = index;
+    updateQueueUI();
+    playTrack(playQueue[queueIndex], false);
+}
+
+async function removeTrackFromCurrentPlaylist(index) {
+    if (!currentUser || !currentViewingPlaylist) return;
+    try {
+        const res = await fetch('/api/playlists/remove_track', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ playlist_id: currentViewingPlaylist.id, user_id: currentUser.id, index: index })
+        });
+        const data = await res.json();
+        showToast(data.message || "Removed track");
+        currentViewingPlaylist.tracks.splice(index, 1);
+        document.getElementById('playlistDetailSub').textContent = `${currentViewingPlaylist.tracks.length} songs`;
+        renderPlaylistTracks(currentViewingPlaylist);
+        loadPlaylistsList();
+    } catch(e) {
+        showToast("Failed to remove track");
+    }
 }
 
 async function renderLikedSongsPanel() {

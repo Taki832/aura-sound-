@@ -383,6 +383,26 @@ async def add_track_to_playlist(playlist_id, owner_id, track_data):
             await db.commit()
             return True, "Added to playlist"
 
+async def remove_track_from_playlist(playlist_id, owner_id, track_idx):
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute('SELECT tracks_json FROM playlists WHERE id = ? AND owner_id = ?', (playlist_id, owner_id)) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return False, "Playlist not found"
+            tracks = json.loads(row[0] or '[]')
+            if 0 <= track_idx < len(tracks):
+                tracks.pop(track_idx)
+                await db.execute('UPDATE playlists SET tracks_json = ? WHERE id = ?', (json.dumps(tracks), playlist_id))
+                await db.commit()
+                return True, "Removed from playlist"
+            return False, "Invalid track index"
+
+async def delete_playlist(playlist_id, owner_id):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('DELETE FROM playlists WHERE id = ? AND owner_id = ?', (playlist_id, owner_id))
+        await db.commit()
+        return True, "Playlist deleted"
+
 async def toggle_liked_song(user_id, track_data):
     track_id = track_data.get('yt_id') or track_data.get('title')
     if not track_id:
