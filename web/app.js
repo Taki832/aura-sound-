@@ -70,95 +70,189 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupEditProfile();
     setupLibrary();
     
-    // Setup User Auth (Telegram WebApp or Browser Guest Fallback)
+    // Setup User Auth
     let authUser = null;
-    if (window.Telegram && window.Telegram.WebApp) {
+    
+    // 1. Try Telegram WebApp
+    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         window.Telegram.WebApp.setHeaderColor('#121212');
-        authUser = window.Telegram.WebApp.initDataUnsafe?.user;
+        authUser = window.Telegram.WebApp.initDataUnsafe.user;
     }
     
+    // 2. Try LocalStorage
     if (!authUser) {
-        let storedGuest = localStorage.getItem('aurasound_guest_user');
-        if (storedGuest) {
-            try { authUser = JSON.parse(storedGuest); } catch(e) {}
-        }
-        if (!authUser) {
-            const guestId = Math.floor(Math.random() * 899999999) + 100000000;
-            authUser = {
-                id: guestId,
-                username: `listener_${guestId % 1000}`,
-                first_name: 'Listener'
-            };
-            localStorage.setItem('aurasound_guest_user', JSON.stringify(authUser));
+        let stored = localStorage.getItem('aurasound_user');
+        if (stored) {
+            try { authUser = JSON.parse(stored); } catch(e) {}
         }
     }
 
-    if (authUser) {
-        // Time-aware greeting
-        const hour = new Date().getHours();
-        let greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-        const greetingEl = document.getElementById('greetingText');
-        if (greetingEl) greetingEl.textContent = `${greeting}, ${authUser.first_name || 'Listener'}`;
-        
-        // Authenticate with backend
-        try {
-            const res = await fetch('/api/auth', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ user: authUser })
-            });
-            const authData = await res.json();
-            if (authData.user) {
-                currentUser = authData.user;
-                console.log("Authenticated as:", currentUser.username || currentUser.display_name);
-                
-                // Populate Profile View
-                const disp = document.getElementById('profileDisplayName');
-                const uname = document.getElementById('profileUsername');
-                const bio = document.getElementById('profileBio');
-                if (disp) disp.textContent = currentUser.display_name || "User";
-                if (uname) uname.textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
-                if (bio) bio.textContent = currentUser.bio || "No bio added.";
-                if (currentUser.avatar_url && document.getElementById('profileAvatar')) {
-                    document.getElementById('profileAvatar').src = currentUser.avatar_url;
-                }
-                if (currentUser.banner_url && document.getElementById('profileBannerImg')) {
-                    document.getElementById('profileBannerImg').src = currentUser.banner_url;
-                }
-                if (currentUser.theme === 'light') {
-                    document.body.classList.add('light-theme');
-                }
-                
-                // Apply Settings
-                try {
-                    const settings = JSON.parse(currentUser.settings_json || '{}');
-                    if (document.getElementById('settingAmoled')) document.getElementById('settingAmoled').checked = settings.amoled || false;
-                    if (document.getElementById('settingGapless')) document.getElementById('settingGapless').checked = settings.gapless !== false;
-                    if (document.getElementById('settingHqAudio')) document.getElementById('settingHqAudio').checked = settings.hqAudio !== false;
-                    if (document.getElementById('settingGlassEffects')) document.getElementById('settingGlassEffects').checked = settings.glassEffects !== false;
-                    
-                    if(settings.amoled) document.body.style.backgroundColor = '#000000';
-                    if(settings.glassEffects === false) {
-                        document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
-                    }
-                } catch(e) {}
-
-                // Load User Data
-                loadFriendsList();
-                loadNotificationsList();
-                loadPlaylistsList();
-                loadLikedSongsList();
-                loadListeningHistory();
-                loadUserStats();
-                loadSearchHistory();
-            }
-        } catch (e) {
-            console.error("Auth failed", e);
-        }
+    if (!authUser) {
+        // Show Login Modal instead of Guest User
+        document.getElementById('loginModalOverlay').classList.remove('hidden');
+        setupLoginModal();
+    } else {
+        await authenticateUser(authUser);
     }
 });
+
+function setupLoginModal() {
+    const btnSendOtp = document.getElementById('btnSendOtp');
+    const btnVerifyOtp = document.getElementById('btnVerifyOtp');
+    const btnBack = document.getElementById('btnBackToLogin');
+    const inputUser = document.getElementById('loginUsernameInput');
+    const inputOtp = document.getElementById('loginOtpInput');
+    const step1 = document.getElementById('loginStep1');
+    const step2 = document.getElementById('loginStep2');
+    
+    let currentUsername = "";
+
+    btnSendOtp.addEventListener('click', async () => {
+        const username = inputUser.value.trim();
+        if(!username) {
+            showToast("Please enter a username!");
+            return;
+        }
+        
+        const oldText = btnSendOtp.textContent;
+        btnSendOtp.textContent = "Sending...";
+        btnSendOtp.disabled = true;
+        
+        try {
+            const res = await fetch('/api/auth/request-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username })
+            });
+            const data = await res.json();
+            
+            if (data.error) {
+                showToast(data.error);
+                btnSendOtp.textContent = oldText;
+                btnSendOtp.disabled = false;
+            } else {
+                currentUsername = username;
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+            }
+        } catch(e) {
+            showToast("Network error!");
+            btnSendOtp.textContent = oldText;
+            btnSendOtp.disabled = false;
+        }
+    });
+    
+    btnBack.addEventListener('click', () => {
+        step2.classList.add('hidden');
+        step1.classList.remove('hidden');
+        btnSendOtp.textContent = "Send Login Code";
+        btnSendOtp.disabled = false;
+        inputOtp.value = "";
+    });
+
+    btnVerifyOtp.addEventListener('click', async () => {
+        const otp = inputOtp.value.trim();
+        if(!otp || otp.length !== 4) {
+            showToast("Please enter the 4-digit code");
+            return;
+        }
+        
+        const oldText = btnVerifyOtp.textContent;
+        btnVerifyOtp.textContent = "Verifying...";
+        btnVerifyOtp.disabled = true;
+        
+        try {
+            const res = await fetch('/api/auth/verify-otp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: currentUsername, otp })
+            });
+            const data = await res.json();
+            
+            if (data.error) {
+                showToast(data.error);
+                btnVerifyOtp.textContent = oldText;
+                btnVerifyOtp.disabled = false;
+            } else if(data.user) {
+                document.getElementById('loginModalOverlay').classList.add('hidden');
+                localStorage.setItem('aurasound_user', JSON.stringify(data.user));
+                await authenticateUser(data.user);
+                showToast("Logged in successfully!");
+            }
+        } catch(e) {
+            showToast("Verification failed!");
+            btnVerifyOtp.textContent = oldText;
+            btnVerifyOtp.disabled = false;
+        }
+    });
+}
+
+async function authenticateUser(authUser) {
+    // Time-aware greeting
+    const hour = new Date().getHours();
+    let greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const greetingEl = document.getElementById('greetingText');
+    if (greetingEl) greetingEl.textContent = `${greeting}, ${authUser.display_name || authUser.first_name || 'Listener'}`;
+    
+    // Authenticate with backend
+    try {
+        const res = await fetch('/api/auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user: authUser })
+        });
+        const authData = await res.json();
+        if (authData.user) {
+            currentUser = authData.user;
+            localStorage.setItem('aurasound_user', JSON.stringify(currentUser));
+            console.log("Authenticated as:", currentUser.username || currentUser.display_name);
+            
+            // Populate Profile View
+            const disp = document.getElementById('profileDisplayName');
+            const uname = document.getElementById('profileUsername');
+            const bio = document.getElementById('profileBio');
+            if (disp) disp.textContent = currentUser.display_name || "User";
+            if (uname) uname.textContent = currentUser.username ? `@${currentUser.username}` : "Listener";
+            if (bio) bio.textContent = currentUser.bio || "No bio added.";
+            if (currentUser.avatar_url && document.getElementById('profileAvatar')) {
+                document.getElementById('profileAvatar').src = currentUser.avatar_url;
+            }
+            if (currentUser.banner_url && document.getElementById('profileBannerImg')) {
+                document.getElementById('profileBannerImg').src = currentUser.banner_url;
+            }
+            if (currentUser.theme === 'light') {
+                document.body.classList.add('light-theme');
+            }
+            
+            // Apply Settings
+            try {
+                const settings = JSON.parse(currentUser.settings_json || '{}');
+                if (document.getElementById('settingAmoled')) document.getElementById('settingAmoled').checked = settings.amoled || false;
+                if (document.getElementById('settingGapless')) document.getElementById('settingGapless').checked = settings.gapless !== false;
+                if (document.getElementById('settingHqAudio')) document.getElementById('settingHqAudio').checked = settings.hqAudio !== false;
+                if (document.getElementById('settingGlassEffects')) document.getElementById('settingGlassEffects').checked = settings.glassEffects !== false;
+                
+                if(settings.amoled) document.body.style.backgroundColor = '#000000';
+                if(settings.glassEffects === false) {
+                    document.documentElement.style.setProperty('--glass-bg', 'rgba(18,18,18,1)');
+                }
+            } catch(e) {}
+
+            // Load User Data
+            loadFriendsList();
+            loadNotificationsList();
+            loadPlaylistsList();
+            loadLikedSongsList();
+            loadListeningHistory();
+            loadUserStats();
+            loadSearchHistory();
+        }
+    } catch (e) {
+        console.error("Auth failed", e);
+    }
+}
 
 // --- YouTube API Callbacks ---
 window.onYouTubeIframeAPIReady = function() {

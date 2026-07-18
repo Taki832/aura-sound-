@@ -788,6 +788,78 @@ async def api_create_room_handler(request):
     except Exception as e:
         return web.json_response({'error': str(e)}, status=500)
 
+active_otps = {} # format: { "username": {"otp": 1234, "expires": timestamp} }
+
+async def api_auth_request_otp_handler(request):
+    try:
+        data = await request.json()
+        username = data.get('username', '').strip().replace('@', '')
+        if not username:
+            return web.json_response({'error': 'Username is required'}, status=400)
+            
+        import random
+        import time
+        otp = random.randint(1000, 9999)
+        active_otps[username.lower()] = {
+            'otp': otp,
+            'expires': time.time() + 300 # 5 minutes expiry
+        }
+        
+        if BOTS_ENABLED and python_bot:
+            try:
+                await python_bot.send_message(username, f"🎧 **AuraSound Login Code**\n\nYour 4-digit code is: **{otp}**\n\n_This code expires in 5 minutes._")
+            except Exception as e:
+                print(f"Failed to send OTP to {username}: {e}")
+                # We can return an error if the bot fails to send (e.g. user hasn't started the bot)
+                return web.json_response({'error': f'Failed to send OTP. Make sure you have started @Crazycando_bot on Telegram! ({str(e)})'}, status=400)
+        else:
+            return web.json_response({'error': 'Telegram bot is not active to send OTP.'}, status=500)
+            
+        return web.json_response({'success': True, 'message': 'OTP sent via Telegram'})
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
+async def api_auth_verify_otp_handler(request):
+    try:
+        data = await request.json()
+        username = data.get('username', '').strip().replace('@', '').lower()
+        otp_input = data.get('otp')
+        
+        if not username or not otp_input:
+            return web.json_response({'error': 'Username and OTP required'}, status=400)
+            
+        import time
+        record = active_otps.get(username)
+        
+        if not record or time.time() > record['expires']:
+            return web.json_response({'error': 'OTP expired or not found'}, status=400)
+            
+        if str(record['otp']) != str(otp_input):
+            return web.json_response({'error': 'Invalid OTP'}, status=400)
+            
+        del active_otps[username] # consume OTP
+        
+        # We need a numeric ID for the DB. If we don't have their Telegram ID, we can generate a mock one or try to fetch it via the bot
+        tg_id = None
+        display_name = username
+        if BOTS_ENABLED and python_bot:
+            try:
+                chat = await python_bot.get_chat(username)
+                tg_id = chat.id
+                display_name = chat.first_name or username
+            except:
+                pass
+                
+        if not tg_id:
+            # Generate a pseudo-random ID based on username if we can't fetch it
+            import hashlib
+            tg_id = int(hashlib.md5(username.encode()).hexdigest()[:8], 16)
+            
+        db_user = await db.get_or_create_user(tg_id, username, display_name)
+        return web.json_response({'user': db_user})
+    except Exception as e:
+        return web.json_response({'error': str(e)}, status=500)
+
 async def api_auth_handler(request):
     try:
         data = await request.json()
@@ -1069,6 +1141,8 @@ def setup_web_app(app):
     app.router.add_get('/api/video', api_video_handler)
     app.router.add_post('/api/room/create', api_create_room_handler)
     app.router.add_post('/api/auth', api_auth_handler)
+    app.router.add_post('/api/auth/request-otp', api_auth_request_otp_handler)
+    app.router.add_post('/api/auth/verify-otp', api_auth_verify_otp_handler)
     app.router.add_post('/api/profile/update', api_update_profile_handler)
     
     # Friends

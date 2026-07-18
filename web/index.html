@@ -513,6 +513,30 @@
     <!-- Toast Banner -->
     <div id="toast" class="toast hidden"></div>
 
+    <!-- Login Modal -->
+    <div id="loginModalOverlay" class="modal-overlay hidden" style="z-index: 9999;">
+        <div class="modal-content" style="max-width: 400px; text-align: center; padding: 40px 20px;">
+            <div style="font-size: 48px; color: var(--spotify-green); margin-bottom: 20px;"><i class="fa-solid fa-headphones-simple"></i></div>
+            <h2 style="margin-bottom: 10px;">Welcome to AuraSound</h2>
+            <p class="text-muted" style="margin-bottom: 24px; font-size: 14px;">Sign in via Telegram to sync your music and join rooms.</p>
+            
+            <div id="loginStep1">
+                <input type="text" id="loginUsernameInput" class="spotify-input" placeholder="Enter Telegram Username (e.g. Taki832)" autocomplete="off" style="text-align: center; font-size: 16px;">
+                <button type="button" id="btnSendOtp" class="btn-spotify-primary" style="margin-top: 20px; width: 100%; padding: 14px; border-radius: 30px; font-weight: 700; font-size: 16px;">Send Login Code</button>
+            </div>
+
+            <div id="loginStep2" class="hidden">
+                <p class="text-muted" style="font-size: 13px; margin-bottom: 16px;">We sent a 4-digit code to you on Telegram.</p>
+                <input type="number" id="loginOtpInput" class="spotify-input" placeholder="0000" autocomplete="off" style="text-align: center; font-size: 24px; letter-spacing: 8px;">
+                <button type="button" id="btnVerifyOtp" class="btn-spotify-primary" style="margin-top: 20px; width: 100%; padding: 14px; border-radius: 30px; font-weight: 700; font-size: 16px;">Verify Code</button>
+                <button type="button" id="btnBackToLogin" class="text-btn" style="margin-top: 16px; color: var(--text-subdued); font-size: 13px; cursor:pointer; background:none; border:none;">Wrong username? Go back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hidden audio element for fallback streaming -->
+    <audio id="htmlAudioFallback" style="display:none;" controls></audio>
+
     <script src="visualizer.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="aura_island.js"></script>
