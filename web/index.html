@@ -32,6 +32,19 @@
                     </div>
                 </header>
                 
+                <!-- ORIGINAL ANIMATED HERO VIDEO BANNER (Spotify Canvas Style) -->
+                <div class="hero-video-banner">
+                    <canvas id="heroCanvas" class="hero-banner-canvas"></canvas>
+                    <div class="hero-banner-overlay">
+                        <div class="hero-badge"><i class="fa-solid fa-compact-disc fa-spin"></i> LIVE VIDEO CANVAS</div>
+                        <h2>AuraSound AI Original Engine</h2>
+                        <p>Real-time synchronized audio visualizer & video rooms live with friends.</p>
+                        <button type="button" class="btn-spotify-primary hero-banner-btn" onclick="document.querySelector('[data-target=\'view-search\']').click();">
+                            <i class="fa-solid fa-play"></i> Explore Music & Videos
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="filter-pills" id="homeSourcePills">
                     <button class="pill active" data-source="all">All</button>
                     <button class="pill" data-source="spotify">Spotify</button>
@@ -463,6 +476,33 @@
                     </div>
                 </div>
                 <div id="playlistTrackList" class="track-list" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
+        <!-- Create New Playlist Modal -->
+        <div id="createNewPlaylistModal" class="full-player-overlay hidden" style="z-index: 9999; background: rgba(18,18,18,0.96); backdrop-filter: blur(20px);">
+            <div class="full-player-header">
+                <button type="button" class="ctrl-btn" id="closeCreatePlaylistModalBtn" title="Close"><i class="fa-solid fa-xmark fa-xl"></i></button>
+                <div class="header-title">Create Playlist</div>
+                <div style="width: 44px;"></div>
+            </div>
+            <div style="padding: 24px; display: flex; flex-direction: column; gap: 16px;">
+                <div style="text-align: center; margin-bottom: 8px;">
+                    <div style="width: 80px; height: 80px; margin: 0 auto; background: linear-gradient(135deg, #1DB954, #450AF5); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 36px; color: #fff; box-shadow: 0 8px 24px rgba(29,185,84,0.3);">
+                        <i class="fa-solid fa-folder-plus"></i>
+                    </div>
+                </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: var(--text-subdued); text-transform: uppercase; margin-bottom: 6px; display: block;">Playlist Name</label>
+                    <input type="text" id="newPlaylistNameInput" class="spotify-input" placeholder="e.g. Chill Vibes 2026" autocomplete="off">
+                </div>
+                <div>
+                    <label style="font-size: 12px; font-weight: 600; color: var(--text-subdued); text-transform: uppercase; margin-bottom: 6px; display: block;">Description (Optional)</label>
+                    <input type="text" id="newPlaylistDescInput" class="spotify-input" placeholder="e.g. My favorite late night beats" autocomplete="off">
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0;">
+                    <span>Public Playlist</span>
+                    <label class="switch"><input type="checkbox" id="newPlaylistPublicToggle" checked><span class="slider round"></span></label>
+                </div>
+                <button type="button" id="btnSubmitCreatePlaylist" class="btn-spotify-primary" style="margin-top: 10px; width: 100%; padding: 14px; border-radius: 30px; font-weight: 700; font-size: 16px;">Create Playlist</button>
             </div>
         </div>
 

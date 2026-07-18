@@ -638,6 +638,73 @@ body {
     border-color: var(--spotify-green);
     transform: scale(1.1);
 }
+
+/* HERO VIDEO BANNER (Spotify Canvas Style) */
+.hero-video-banner {
+    position: relative;
+    width: calc(100% - 32px);
+    margin: 12px 16px 20px 16px;
+    height: 185px;
+    border-radius: 20px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #090919 0%, #15002a 50%, #002b20 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+}
+.hero-banner-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+.hero-banner-overlay {
+    position: relative;
+    z-index: 2;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 100%;
+    background: radial-gradient(circle at top left, rgba(0,0,0,0.1), rgba(0,0,0,0.75));
+}
+.hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--spotify-green);
+    background: rgba(29, 185, 84, 0.15);
+    padding: 4px 10px;
+    border-radius: 20px;
+    width: fit-content;
+    margin-bottom: 8px;
+    border: 1px solid rgba(29, 185, 84, 0.3);
+}
+.hero-banner-overlay h2 {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.5);
+}
+.hero-banner-overlay p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 14px;
+    max-width: 85%;
+}
+.hero-banner-btn {
+    width: fit-content;
+    padding: 8px 18px;
+    font-weight: 700;
+    font-size: 13px;
+    border-radius: 24px;
+}
 .track-action-btn:active {
     transform: scale(0.92);
 }

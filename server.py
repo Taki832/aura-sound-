@@ -33,15 +33,15 @@ except RuntimeError:
 
 MINI_APP_URL = os.environ.get("MINI_APP_URL", "https://certainly-unblessed-crablike.ngrok-free.dev")
 
-# Telegram bots are opt-in: set ENABLE_BOTS=1 to activate
+# Telegram bots are active by default (set ENABLE_BOTS=0 to disable)
 BOTS_ENABLED = False
 python_bot = None
 mojo_bot = None
 
-if os.environ.get("ENABLE_BOTS", "0") == "1":
+if os.environ.get("ENABLE_BOTS", "1") == "1":
     try:
         from pyrogram import Client, filters
-        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
+        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo, BotCommand
         
         API_ID          = 28640193
         API_HASH        = "f21327975cce7fb1e9c0fd9d72e0812a"
@@ -55,7 +55,7 @@ if os.environ.get("ENABLE_BOTS", "0") == "1":
     except ImportError:
         print("[Notice] Pyrogram not installed. Bots disabled.")
 else:
-    print("[Notice] Telegram bots disabled. Set ENABLE_BOTS=1 to activate.")
+    print("[Notice] Telegram bots disabled.")
 
 # ─── Global Server-Driven Room State ─────────────────────────────────────────
 sync_rooms = {}
@@ -356,6 +356,30 @@ if BOTS_ENABLED:
         await message.reply_text(text, reply_markup=keyboard)
 
     register_bot_handler(["help"], cmd_help)
+
+    @python_bot.on_callback_query()
+    @mojo_bot.on_callback_query()
+    async def handle_bot_callbacks(client, callback_query):
+        if callback_query.data == "show_help":
+            text = (
+                "🤖 **AuraSound.AI Bot Commands Menu:**\n\n"
+                "• `/app` or `/start` — Launch Mini App\n"
+                "• `/room [CODE]` — Join or invite friends to a Sync Room\n"
+                "• `/nowplaying` — View currently playing music in active rooms\n"
+                "• `/playlists` — View your custom playlists\n"
+                "• `/history` — View your listening & search history\n"
+                "• `/friends` — View your friends list & pending requests\n"
+                "• `/search [query]` — Live music search\n"
+                "• `/help` — Display this command menu\n"
+            )
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Open AuraSound App", web_app=WebAppInfo(url=MINI_APP_URL))]
+            ])
+            await callback_query.message.reply_text(text, reply_markup=keyboard)
+            try:
+                await callback_query.answer()
+            except Exception:
+                pass
 
 # ─── Multi-Source Extraction Helpers ────────────────────────────────────────────
 def multi_source_search(query: str, source: str = 'all', limit: int = 6):
@@ -1099,6 +1123,26 @@ async def main():
             print("[1/5] Starting Telegram Bots (10s timeout)...")
             await asyncio.wait_for(python_bot.start(), timeout=10)
             await asyncio.wait_for(mojo_bot.start(), timeout=10)
+
+            # Register Bot Commands for Telegram GUI popup menu
+            commands_list = [
+                BotCommand("start", "🚀 Launch AuraSound AI Mini App"),
+                BotCommand("app", "🚀 Launch AuraSound AI Mini App"),
+                BotCommand("room", "🎬 Join or Invite to Sync Room"),
+                BotCommand("nowplaying", "🎶 Currently Playing Songs"),
+                BotCommand("playlists", "📁 View Saved Playlists"),
+                BotCommand("history", "📜 Listening & Search History"),
+                BotCommand("friends", "👥 Friends & Network"),
+                BotCommand("search", "🔍 Search Live Music"),
+                BotCommand("help", "🤖 Command Menu & Guide")
+            ]
+            try:
+                await python_bot.set_my_commands(commands_list)
+                await mojo_bot.set_my_commands(commands_list)
+                print("  ✓ Registered Telegram Command Popup Menus")
+            except Exception as cmd_e:
+                print(f"  ⚠ Command registration notice: {cmd_e}")
+
             print("  ✓ Telegram Bots connected successfully")
         except asyncio.TimeoutError:
             print("  ⚠ Telegram Bot startup timed out — running in web-only mode")
