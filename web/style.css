@@ -575,16 +575,71 @@ body {
     color: #fff;
     margin-bottom: 32px;
 }
+.ctrl-btn {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    transition: transform 0.15s ease, background-color 0.2s ease, color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+}
+.ctrl-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.08);
+}
+.ctrl-btn:active {
+    transform: scale(0.92);
+}
 .play-pause-circle {
     width: 64px;
     height: 64px;
     background: #fff;
     color: #000;
+    border: none;
     border-radius: 50%;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease, background-color 0.2s ease;
+}
+.play-pause-circle:hover {
+    transform: scale(1.06);
+    background: var(--spotify-green);
+    color: #000;
+}
+.play-pause-circle:active {
+    transform: scale(0.95);
+}
+.track-action-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.track-action-btn:hover {
+    background: var(--spotify-green);
+    color: #000;
+    border-color: var(--spotify-green);
+    transform: scale(1.1);
+}
+.track-action-btn:active {
+    transform: scale(0.92);
 }
 .text-muted { color: var(--text-subdued); }
 

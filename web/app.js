@@ -374,10 +374,10 @@ async function performSearch(query) {
                     </div>
                 </div>
                 <div class="track-actions">
-                    <i class="fa-solid fa-plus add-queue-btn" title="Add to Queue"></i>
-                    <i class="fa-solid fa-folder-plus add-playlist-btn" title="Add to Playlist"></i>
-                    <i class="fa-solid fa-play play-audio-btn" title="Play Audio"></i>
-                    <i class="fa-solid fa-film play-video-btn" title="Play Video"></i>
+                    <button type="button" class="track-action-btn add-queue-btn" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
+                    <button type="button" class="track-action-btn add-playlist-btn" title="Add to Playlist"><i class="fa-solid fa-folder-plus"></i></button>
+                    <button type="button" class="track-action-btn play-audio-btn" title="Play Audio"><i class="fa-solid fa-play"></i></button>
+                    <button type="button" class="track-action-btn play-video-btn" title="Play Video"><i class="fa-solid fa-film"></i></button>
                 </div>
             `;
             
