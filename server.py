@@ -15,6 +15,7 @@ import traceback
 from aiohttp import web, WSMsgType
 
 import db
+import urllib.parse
 from storage import StorageService
 from ai_engine import AIEngine
 
@@ -63,20 +64,298 @@ YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,32}$")
 
 # ─── Telegram Bot Handlers ─────────────────────────────────────────────────────
 if BOTS_ENABLED:
-    @python_bot.on_message(filters.command("start") | filters.command("app"))
-    @mojo_bot.on_message(filters.command("start") | filters.command("app"))
-    async def send_mini_app_button(client, message):
-        user_name = message.from_user.first_name if message.from_user else "Vishnu"
+    def register_bot_handler(cmd_list, handler_func):
+        """Register a command handler for both python_bot and mojo_bot."""
+        flt = filters.command(cmd_list)
+        python_bot.on_message(flt)(handler_func)
+        mojo_bot.on_message(flt)(handler_func)
+
+    # 1. /start and /app (with deep link room support)
+    async def cmd_start_app(client, message):
+        user = message.from_user
+        user_name = user.first_name if user else "Listener"
+        tg_id = user.id if user else 0
+        username = user.username if user else ""
+
+        if tg_id:
+            try:
+                await db.get_or_create_user(tg_id, username, user_name)
+            except Exception:
+                pass
+
+        args = message.command[1:] if len(message.command) > 1 else []
+        room_code = None
+        if args and args[0].startswith("room_"):
+            room_code = args[0].replace("room_", "").upper()
+
+        if room_code:
+            room_url = f"{MINI_APP_URL}?room={room_code}"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"🚀 Join Sync Room #{room_code}", web_app=WebAppInfo(url=room_url))],
+                [InlineKeyboardButton("🌐 Open Room in Browser", url=room_url)],
+                [InlineKeyboardButton("🎵 Open AuraSound Home", web_app=WebAppInfo(url=MINI_APP_URL))]
+            ])
+            await message.reply_text(
+                f"👋 **Welcome, {user_name}!**\n\n"
+                f"🎉 You were invited to join **Sync Room #{room_code}**!\n"
+                "Listen to music & watch video songs live with your friends.",
+                reply_markup=keyboard
+            )
+        else:
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🚀 Open AuraSound AI Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
+                [InlineKeyboardButton("🌐 Open in Browser", url=MINI_APP_URL)],
+                [InlineKeyboardButton("❓ Help & Commands", callback_data="show_help")]
+            ])
+            await message.reply_text(
+                f"👋 **Welcome, {user_name}!**\n\n"
+                "🎬 **AuraSound.AI — Production Audio & Video Engine**\n"
+                "Tap below to launch the Mini App, create sync rooms, listen to music, watch YouTube videos, and collaborate with friends in real-time!\n\n"
+                "Type `/help` to view all available commands.",
+                reply_markup=keyboard
+            )
+
+    register_bot_handler(["start", "app"], cmd_start_app)
+
+    # 2. /room, /join, /invite
+    async def cmd_room_join(client, message):
+        args = message.command[1:] if len(message.command) > 1 else []
+        room_code = args[0].upper() if args else None
+
+        if not room_code:
+            active_codes = list(sync_rooms.keys())
+            if active_codes:
+                room_code = active_codes[0]
+            else:
+                await message.reply_text(
+                    "❌ **No active rooms specified!**\n\n"
+                    "Usage: `/room [ROOM_CODE]` or `/join [ROOM_CODE]`\n\n"
+                    "Or open the Mini App to create a brand new room!",
+                    reply_markup=InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🚀 Create Sync Room", web_app=WebAppInfo(url=MINI_APP_URL))]
+                    ])
+                )
+                return
+
+        room_url = f"{MINI_APP_URL}?room={room_code}"
+        bot_uname = getattr(client, 'me', None) and getattr(client.me, 'username', None) or "Crazycando_bot"
+        invite_link = f"https://t.me/{bot_uname}?start=room_{room_code}"
+        share_text = urllib.parse.quote("Join my AuraSound Sync Room!")
+
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🚀 Open AuraSound AI Mini App", web_app=WebAppInfo(url=MINI_APP_URL))],
-            [InlineKeyboardButton("🌐 Open in Browser", url=MINI_APP_URL)]
+            [InlineKeyboardButton(f"🚀 Join Sync Room #{room_code}", web_app=WebAppInfo(url=room_url))],
+            [InlineKeyboardButton("🔗 Share Invite Link", url=f"https://t.me/share/url?url={invite_link}&text={share_text}")],
+            [InlineKeyboardButton("🌐 Open in Browser", url=room_url)]
         ])
+
         await message.reply_text(
-            f"👋 **Welcome, {user_name}!**\n\n"
-            "🎬 **AuraSound.AI — Audio & Video Sync Room**\n"
-            "Tap the button below to launch the Mini App inside Telegram, listen to music or watch YouTube video songs live with friends!",
+            f"🎬 **Sync Room #{room_code}**\n\n"
+            f"• **Direct WebApp Link:** [Open Room]({room_url})\n"
+            f"• **Telegram Invite Link:** `{invite_link}`\n\n"
+            "Share this link with your friends to listen & watch live together!",
             reply_markup=keyboard
         )
+
+    register_bot_handler(["room", "join", "invite"], cmd_room_join)
+
+    # 3. /nowplaying and /playing
+    async def cmd_now_playing(client, message):
+        playing_rooms = []
+        for code, room in sync_rooms.items():
+            track = room.get('current_track')
+            if track:
+                playing_rooms.append((code, room, track))
+
+        if not playing_rooms:
+            await message.reply_text(
+                "🎵 **No tracks currently playing in active rooms!**\n\n"
+                "Launch the app and start a track to play for your room.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Launch Player", web_app=WebAppInfo(url=MINI_APP_URL))]
+                ])
+            )
+            return
+
+        text = "🎶 **Currently Playing in AuraSound Sync Rooms:**\n\n"
+        buttons = []
+        for code, room, track in playing_rooms[:5]:
+            title = track.get('title', 'Unknown Track')
+            is_playing = room.get('is_playing', False)
+            status_emoji = "▶️" if is_playing else "⏸️"
+            members_cnt = len(room.get('members', []))
+            
+            text += f"{status_emoji} **{title}**\n"
+            text += f"   • Room: `#{code}` | Members: {members_cnt}\n\n"
+            
+            room_url = f"{MINI_APP_URL}?room={code}"
+            buttons.append([InlineKeyboardButton(f"🎧 Listen to #{code}", web_app=WebAppInfo(url=room_url))])
+
+        buttons.append([InlineKeyboardButton("🚀 Open Mini App", web_app=WebAppInfo(url=MINI_APP_URL))])
+        await message.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+
+    register_bot_handler(["nowplaying", "playing"], cmd_now_playing)
+
+    # 4. /playlists
+    async def cmd_playlists(client, message):
+        user = message.from_user
+        if not user or not user.id:
+            await message.reply_text("❌ Could not verify user.")
+            return
+
+        db_user = await db.get_user_profile(user.id)
+        if not db_user:
+            db_user = await db.get_or_create_user(user.id, user.username or "", user.first_name or "Listener")
+
+        playlists = await db.get_user_playlists(db_user['id'])
+        if not playlists:
+            await message.reply_text(
+                "📁 **You don't have any playlists yet!**\n\n"
+                "Create and manage custom playlists in the Your Library section.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🚀 Open Library", web_app=WebAppInfo(url=MINI_APP_URL))]
+                ])
+            )
+            return
+
+        text = f"📁 **Your Playlists ({len(playlists)}):**\n\n"
+        for p in playlists:
+            tracks_cnt = len(p.get('tracks', []))
+            vis = "Public 🌐" if p.get('is_public') else "Private 🔒"
+            text += f"🎵 **{p['name']}** — {tracks_cnt} tracks ({vis})\n"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Manage Playlists in App", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.reply_text(text, reply_markup=keyboard)
+
+    register_bot_handler(["playlists"], cmd_playlists)
+
+    # 5. /history
+    async def cmd_history(client, message):
+        user = message.from_user
+        if not user or not user.id:
+            return
+
+        db_user = await db.get_user_profile(user.id)
+        if not db_user:
+            db_user = await db.get_or_create_user(user.id, user.username or "", user.first_name or "Listener")
+
+        listening = await db.get_listening_history(db_user['id'], limit=5)
+        searches = await db.get_search_history(db_user['id'], limit=5)
+
+        text = "📜 **Your Listening & Search History:**\n\n"
+        
+        if listening:
+            text += "🎧 **Recently Played Tracks:**\n"
+            for t in listening:
+                title = t.get('title', 'Unknown')
+                text += f"  • {title}\n"
+            text += "\n"
+        else:
+            text += "🎧 **Recently Played Tracks:** None yet.\n\n"
+
+        if searches:
+            text += "🔍 **Recent Searches:**\n"
+            for s in searches:
+                text += f"  • `{s['query']}`\n"
+        else:
+            text += "🔍 **Recent Searches:** None yet.\n"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Open AuraSound App", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.reply_text(text, reply_markup=keyboard)
+
+    register_bot_handler(["history"], cmd_history)
+
+    # 6. /friends
+    async def cmd_friends(client, message):
+        user = message.from_user
+        if not user or not user.id:
+            return
+
+        db_user = await db.get_user_profile(user.id)
+        if not db_user:
+            db_user = await db.get_or_create_user(user.id, user.username or "", user.first_name or "Listener")
+
+        friends = await db.get_friends_list(db_user['id'])
+        requests = await db.get_friend_requests(db_user['id'])
+
+        text = f"👥 **Friends & Network:**\n\n"
+        text += f"• **Total Friends:** {len(friends)}\n"
+        if friends:
+            for f in friends[:5]:
+                name = f.get('display_name') or f.get('username') or 'User'
+                text += f"  • {name}\n"
+            if len(friends) > 5:
+                text += f"  ... and {len(friends)-5} more\n"
+        
+        text += f"\n• **Pending Friend Requests:** {len(requests)}\n"
+        if requests:
+            for r in requests:
+                req_name = r.get('display_name') or r.get('username') or 'User'
+                text += f"  • From {req_name}\n"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Open Friends in App", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.reply_text(text, reply_markup=keyboard)
+
+    register_bot_handler(["friends"], cmd_friends)
+
+    # 7. /search [query]
+    async def cmd_search(client, message):
+        args = message.command[1:] if len(message.command) > 1 else []
+        query = " ".join(args).strip()
+
+        if not query:
+            await message.reply_text(
+                "🔍 **Search Live Music:**\n\n"
+                "Usage: `/search [song or artist name]`\n"
+                "Example: `/search Blinding Lights`"
+            )
+            return
+
+        await message.reply_text(f"🔎 Searching YouTube for `{query}`...")
+        
+        loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(None, multi_source_search, query, 'all', 3)
+
+        if not results:
+            await message.reply_text("❌ No search results found.")
+            return
+
+        text = f"🎵 **Search Results for '{query}':**\n\n"
+        for idx, t in enumerate(results, 1):
+            dur = formatTime(t.get('duration', 0))
+            text += f"{idx}. **{t['title']}** ({dur})\n"
+
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Play Results in App", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.reply_text(text, reply_markup=keyboard)
+
+    register_bot_handler(["search"], cmd_search)
+
+    # 8. /help
+    async def cmd_help(client, message):
+        text = (
+            "🤖 **AuraSound.AI Bot Commands Menu:**\n\n"
+            "• `/app` or `/start` — Launch Mini App\n"
+            "• `/room [CODE]` — Join or invite friends to a Sync Room\n"
+            "• `/nowplaying` — View currently playing music in active rooms\n"
+            "• `/playlists` — View your custom playlists\n"
+            "• `/history` — View your listening & search history\n"
+            "• `/friends` — View your friends list & pending requests\n"
+            "• `/search [query]` — Live music search\n"
+            "• `/help` — Display this command menu\n"
+        )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚀 Open AuraSound App", web_app=WebAppInfo(url=MINI_APP_URL))]
+        ])
+        await message.reply_text(text, reply_markup=keyboard)
+
+    register_bot_handler(["help"], cmd_help)
 
 # ─── Multi-Source Extraction Helpers ────────────────────────────────────────────
 def multi_source_search(query: str, source: str = 'all', limit: int = 6):
