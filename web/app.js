@@ -79,12 +79,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         try { authUser = JSON.parse(stored); } catch(e) {}
     }
     
-    // 2. Try Telegram WebApp if no stored session
-    if (!authUser && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
-        window.Telegram.WebApp.ready();
-        window.Telegram.WebApp.expand();
-        window.Telegram.WebApp.setHeaderColor('#121212');
-        authUser = window.Telegram.WebApp.initDataUnsafe.user;
+    // 2. Try Telegram WebApp
+    if (window.Telegram && window.Telegram.WebApp) {
+        try {
+            window.Telegram.WebApp.ready();
+            window.Telegram.WebApp.expand();
+            window.Telegram.WebApp.setHeaderColor('#121212');
+        } catch(e) {}
+        if (!authUser && window.Telegram.WebApp.initDataUnsafe?.user) {
+            authUser = window.Telegram.WebApp.initDataUnsafe.user;
+        }
     }
 
     if (!authUser) {

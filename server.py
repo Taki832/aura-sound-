@@ -1177,11 +1177,11 @@ async def security_and_rate_limit_middleware(request, handler):
         print(f"[Unhandled Server Error] {e}")
         response = web.json_response({'error': 'Internal server error'}, status=500)
 
-    # Security Headers
+    # Security & Telegram Framing Headers
     response.headers['ngrok-skip-browser-warning'] = 'true'
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['X-Content-Type-Options'] = 'nosniff'
-    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['Content-Security-Policy'] = "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://t.me https://*.t.me;"
     response.headers['X-XSS-Protection'] = '1; mode=block'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
