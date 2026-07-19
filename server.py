@@ -63,7 +63,7 @@ else:
 # ─── Global Server-Driven Room State ─────────────────────────────────────────
 sync_rooms = {}
 ROOM_CODE_PATTERN = re.compile(r"^[A-Z0-9-]{3,64}$")
-YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,32}$")
+YOUTUBE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 # ─── Telegram Bot Handlers ─────────────────────────────────────────────────────
 if BOTS_ENABLED:
@@ -447,32 +447,38 @@ def get_direct_stream_url(query: str):
         if time.time() - ts < 3600:
             return cached_url, title, thumb, dur
 
-    opts = {
-        'format': 'bestaudio[ext=m4a]/bestaudio/best', 
-        'noplaylist': True, 
-        'quiet': True, 
-        'no_warnings': True,
-        'extract_flat': False,
-        'extractor_args': {'youtube': {'player_client': ['android', 'ios', 'mweb', 'web']}}
-    }
-    with yt_dlp.YoutubeDL(opts) as ydl:
+    target = f"https://www.youtube.com/watch?v={query}" if YOUTUBE_ID_PATTERN.fullmatch(query) else f"ytsearch:{query}"
+
+    client_configs = [
+        ['android', 'ios', 'tv_embedded'],
+        ['tvhtml5', 'android'],
+        ['android']
+    ]
+
+    for clients in client_configs:
+        opts = {
+            'format': 'bestaudio/best', 
+            'noplaylist': True, 
+            'quiet': True, 
+            'no_warnings': True,
+            'extract_flat': False,
+            'extractor_args': {'youtube': {'player_client': clients}}
+        }
         try:
-            target = f"https://www.youtube.com/watch?v={query}" if YOUTUBE_ID_PATTERN.fullmatch(query) else f"ytsearch:{query}"
-            info = ydl.extract_info(target, download=False)
-            if info:
-                if info.get('entries') and len(info['entries']) > 0:
-                    v = info['entries'][0]
-                else:
-                    v = info
-                res_url = v.get('url')
-                res_title = v.get('title')
-                res_thumb = v.get('thumbnail', '')
-                res_dur = v.get('duration', 0)
-                if res_url:
-                    stream_url_cache[clean_q] = (res_url, res_title, res_thumb, res_dur, time.time())
-                return res_url, res_title, res_thumb, res_dur
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(target, download=False)
+                if info:
+                    v = info['entries'][0] if info.get('entries') and len(info['entries']) > 0 else info
+                    res_url = v.get('url')
+                    res_title = v.get('title')
+                    res_thumb = v.get('thumbnail', '')
+                    res_dur = v.get('duration', 0)
+                    if res_url:
+                        stream_url_cache[clean_q] = (res_url, res_title, res_thumb, res_dur, time.time())
+                        return res_url, res_title, res_thumb, res_dur
         except Exception as e:
-            print(f"[Direct Audio Stream Error] {e}")
+            print(f"[Direct Audio Stream Notice - Client {clients}] {e}")
+
     return None, None, None, 0
 
 def get_youtube_video_metadata(query: str):
