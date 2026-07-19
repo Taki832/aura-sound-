@@ -1002,22 +1002,46 @@ async def get_room_messages(room_code, limit=50):
 
 # --- USER FUNCTIONS ---
 async def get_or_create_user(user_id, username, display_name, avatar_url=""):
+    clean_username = username.strip().replace('@', '').lower() if username else ""
     async with aiosqlite.connect(DB_PATH) as db:
+        # First try to find by numeric ID
         async with db.execute('SELECT * FROM users WHERE id = ?', (user_id,)) as cursor:
             row = await cursor.fetchone()
             if row:
-                return dict(zip([col[0] for col in cursor.description], row))
-            
-            now = int(time.time())
-            await db.execute('''
-                INSERT INTO users (id, username, display_name, avatar_url, joined_date)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (user_id, username, display_name, avatar_url, now))
-            await db.commit()
-            
-            async with db.execute('SELECT * FROM users WHERE id = ?', (user_id,)) as new_cursor:
-                new_row = await new_cursor.fetchone()
-                return dict(zip([col[0] for col in new_cursor.description], new_row))
+                user_dict = dict(zip([col[0] for col in cursor.description], row))
+                if clean_username and not user_dict.get('username'):
+                    await db.execute('UPDATE users SET username = ? WHERE id = ?', (clean_username, user_id))
+                    await db.commit()
+                    user_dict['username'] = clean_username
+                return user_dict
+                
+        # If not found by ID, try finding by username (case-insensitive)
+        if clean_username:
+            async with db.execute('SELECT * FROM users WHERE LOWER(username) = ?', (clean_username,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    existing = dict(zip([col[0] for col in cursor.description], row))
+                    old_id = existing['id']
+                    if old_id != user_id:
+                        await db.execute('UPDATE users SET id = ? WHERE id = ?', (user_id, old_id))
+                        await db.execute('UPDATE playlists SET owner_id = ? WHERE owner_id = ?', (user_id, old_id))
+                        await db.execute('UPDATE liked_songs SET user_id = ? WHERE user_id = ?', (user_id, old_id))
+                        await db.execute('UPDATE listening_history SET user_id = ? WHERE user_id = ?', (user_id, old_id))
+                        await db.execute('UPDATE search_history SET user_id = ? WHERE user_id = ?', (user_id, old_id))
+                        await db.commit()
+                        existing['id'] = user_id
+                    return existing
+
+        now = int(time.time())
+        await db.execute('''
+            INSERT INTO users (id, username, display_name, avatar_url, joined_date)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, clean_username or username, display_name, avatar_url, now))
+        await db.commit()
+        
+        async with db.execute('SELECT * FROM users WHERE id = ?', (user_id,)) as new_cursor:
+            new_row = await new_cursor.fetchone()
+            return dict(zip([col[0] for col in new_cursor.description], new_row))
 
 async def update_user_profile(user_id, updates):
     if not updates:

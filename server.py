@@ -749,6 +749,54 @@ async def api_stream_handler(request):
         return web.json_response({'stream_url': url, 'title': title, 'thumbnail': thumb, 'duration': dur})
     return web.json_response({'error': 'Audio stream not found'}, status=404)
 
+async def api_audio_proxy_handler(request):
+    query = request.query.get('q', '').strip()
+    if not query:
+        return web.json_response({'error': 'Query is required'}, status=400)
+
+    print(f"[HTTP API Proxy] Audio Pipe Stream Request: '{query}'")
+    loop = asyncio.get_running_loop()
+    url, title, thumb, dur = await loop.run_in_executor(None, get_direct_stream_url, query)
+
+    if not url:
+        return web.json_response({'error': 'Audio stream not found'}, status=404)
+
+    req_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Encoding': 'identity;q=1.0, *;q=0'
+    }
+    if 'Range' in request.headers:
+        req_headers['Range'] = request.headers['Range']
+
+    try:
+        session = aiohttp.ClientSession()
+        resp = await session.get(url, headers=req_headers)
+        
+        resp_headers = {
+            'Content-Type': resp.headers.get('Content-Type', 'audio/mp4'),
+            'Accept-Ranges': 'bytes',
+            'Access-Control-Allow-Origin': '*',
+        }
+        if 'Content-Length' in resp.headers:
+            resp_headers['Content-Length'] = resp.headers['Content-Length']
+        if 'Content-Range' in resp.headers:
+            resp_headers['Content-Range'] = resp.headers['Content-Range']
+
+        stream_response = web.StreamResponse(status=resp.status, headers=resp_headers)
+        await stream_response.prepare(request)
+
+        async for chunk in resp.content.iter_chunked(64 * 1024):
+            await stream_response.write(chunk)
+
+        await stream_response.write_eof()
+        await resp.release()
+        await session.close()
+        return stream_response
+    except Exception as e:
+        print(f"[Audio Proxy Error] {e}")
+        return web.json_response({'error': str(e)}, status=500)
+
 async def api_video_handler(request):
     """Return a video ID; the browser streams it through YouTube's supported embed player."""
     video_id = request.query.get('id', '').strip()
@@ -1143,6 +1191,7 @@ async def api_metrics_handler(request):
 def setup_web_app(app):
     app.router.add_get('/api/search', api_search_handler)
     app.router.add_get('/api/stream', api_stream_handler)
+    app.router.add_get('/api/audio_proxy', api_audio_proxy_handler)
     app.router.add_get('/api/video', api_video_handler)
     app.router.add_post('/api/room/create', api_create_room_handler)
     app.router.add_post('/api/auth', api_auth_handler)

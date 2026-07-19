@@ -73,24 +73,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Setup User Auth
     let authUser = null;
     
-    // 1. Try Telegram WebApp
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
+    // 1. Try LocalStorage (persistent saved login)
+    let stored = localStorage.getItem('aurasound_user');
+    if (stored) {
+        try { authUser = JSON.parse(stored); } catch(e) {}
+    }
+    
+    // 2. Try Telegram WebApp if no stored session
+    if (!authUser && window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe?.user) {
         window.Telegram.WebApp.ready();
         window.Telegram.WebApp.expand();
         window.Telegram.WebApp.setHeaderColor('#121212');
         authUser = window.Telegram.WebApp.initDataUnsafe.user;
     }
-    
-    // 2. Try LocalStorage
-    if (!authUser) {
-        let stored = localStorage.getItem('aurasound_user');
-        if (stored) {
-            try { authUser = JSON.parse(stored); } catch(e) {}
-        }
-    }
 
     if (!authUser) {
-        // Show Login Modal instead of Guest User
         document.getElementById('loginModalOverlay').classList.remove('hidden');
         setupLoginModal();
     } else {
@@ -674,6 +671,31 @@ function setupPlayerControls() {
         showToast(isShuffleMode ? "Shuffle On" : "Shuffle Off");
     });
 
+    // Queue Section Shuffle & Clear Buttons
+    document.getElementById('btnShuffleQueue')?.addEventListener('click', () => {
+        if (playQueue.length <= 1) {
+            showToast("Queue needs at least 2 tracks to shuffle!");
+            return;
+        }
+        const played = playQueue.slice(0, queueIndex + 1);
+        const upcoming = playQueue.slice(queueIndex + 1);
+        for (let i = upcoming.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [upcoming[i], upcoming[j]] = [upcoming[j], upcoming[i]];
+        }
+        playQueue = [...played, ...upcoming];
+        updateQueueUI();
+        showToast("Queue Shuffled!");
+    });
+
+    document.getElementById('btnClearQueue')?.addEventListener('click', () => {
+        if (playQueue.length === 0) return;
+        playQueue = [];
+        queueIndex = -1;
+        updateQueueUI();
+        showToast("Queue Cleared");
+    });
+
     // Loop button listener
     const loopBtn = document.getElementById('fullLoopBtn');
     loopBtn?.addEventListener('click', () => {
@@ -867,26 +889,21 @@ function applyTrackUI(track, asVideo) {
         youtubePlayerHost.classList.add('hidden');
         fullArtEl.classList.remove('hidden');
         if (isYtReady && ytPlayer && ytPlayer.stopVideo) ytPlayer.stopVideo();
-        if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.loadVideoById) {
-            hiddenYtPlayer.loadVideoById(track.yt_id);
-        } else if (htmlAudio) {
-            fetch(`/api/stream?q=${encodeURIComponent(track.yt_id || track.title)}`)
-                .then(r => r.json())
-                .then(d => {
-                    if (d.stream_url) {
-                        htmlAudio.src = d.stream_url;
-                        htmlAudio.play().catch(() => {});
-                    }
-                }).catch(() => {});
+        if (htmlAudio) {
+            const proxyUrl = `/api/audio_proxy?q=${encodeURIComponent(track.yt_id || track.title)}`;
+            if (htmlAudio.dataset.loadedTrack !== (track.yt_id || track.title)) {
+                htmlAudio.dataset.loadedTrack = track.yt_id || track.title;
+                htmlAudio.src = proxyUrl;
+            }
         }
     }
 }
 
 function getLocalPosition() {
     if (isVideoMode && isYtReady && ytPlayer && ytPlayer.getCurrentTime) return ytPlayer.getCurrentTime() || 0;
-    if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.getCurrentTime) return hiddenYtPlayer.getCurrentTime() || 0;
     const htmlAudio = document.getElementById('htmlAudioFallback');
     if (htmlAudio && !htmlAudio.paused) return htmlAudio.currentTime || 0;
+    if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.getCurrentTime) return hiddenYtPlayer.getCurrentTime() || 0;
     return 0;
 }
 
@@ -897,27 +914,21 @@ function playLocal() {
     if (isVideoMode && isYtReady && ytPlayer && ytPlayer.playVideo) {
         if (htmlAudio) htmlAudio.pause();
         ytPlayer.playVideo();
-    } else if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.playVideo) {
-        if (htmlAudio) htmlAudio.pause();
-        hiddenYtPlayer.playVideo();
-    } else if (htmlAudio && currentTrack) {
-        // HTML5 Audio fallback — fetch the real stream URL from the API
+    } else if (!isVideoMode && htmlAudio && currentTrack) {
         const trackKey = currentTrack.yt_id || currentTrack.title;
-        if (!htmlAudio.dataset.loadedTrack || htmlAudio.dataset.loadedTrack !== trackKey) {
+        const proxyUrl = `/api/audio_proxy?q=${encodeURIComponent(trackKey)}`;
+        if (htmlAudio.dataset.loadedTrack !== trackKey || !htmlAudio.src) {
             htmlAudio.dataset.loadedTrack = trackKey;
-            fetch(`/api/stream?q=${encodeURIComponent(trackKey)}`)
-                .then(r => r.json())
-                .then(d => {
-                    if (d.stream_url) {
-                        htmlAudio.src = d.stream_url;
-                        htmlAudio.play().catch(e => console.log("Audio play fallback:", e));
-                    } else {
-                        console.log("No stream_url returned from /api/stream");
-                    }
-                }).catch(e => console.log("Stream fetch error:", e));
-        } else {
-            htmlAudio.play().catch(e => console.log("Audio play fallback:", e));
+            htmlAudio.src = proxyUrl;
         }
+        htmlAudio.play().catch(e => {
+            console.log("HTML5 Audio Proxy play notice:", e);
+            if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.playVideo) {
+                hiddenYtPlayer.playVideo();
+            }
+        });
+    } else if (!isVideoMode && isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.playVideo) {
+        hiddenYtPlayer.playVideo();
     }
 }
 
@@ -930,7 +941,6 @@ function playLocal() {
     });
     htmlAudio.addEventListener('timeupdate', () => {
         if (!currentTrack || isVideoMode) return;
-        if (isHiddenYtReady && hiddenYtPlayer && hiddenYtPlayer.getPlayerState && hiddenYtPlayer.getPlayerState() === 1) return;
         const pos = htmlAudio.currentTime || 0;
         if (!seekSlider.matches(':active')) {
             seekSlider.value = pos;
