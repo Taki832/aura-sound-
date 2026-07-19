@@ -262,7 +262,8 @@ window.onYouTubeIframeAPIReady = function() {
         playerVars: { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'playsinline': 1 },
         events: {
             'onReady': () => { isYtReady = true; },
-            'onStateChange': onYtStateChange
+            'onStateChange': onYtStateChange,
+            'onError': onYtError
         }
     });
 
@@ -272,10 +273,41 @@ window.onYouTubeIframeAPIReady = function() {
         playerVars: { 'autoplay': 0, 'controls': 0, 'playsinline': 1 },
         events: {
             'onReady': () => { isHiddenYtReady = true; },
-            'onStateChange': onHiddenYtStateChange
+            'onStateChange': onHiddenYtStateChange,
+            'onError': onHiddenYtError
         }
     });
 };
+
+function onYtError(event) {
+    console.error("YouTube Video Player Error:", event.data);
+    showToast("Video embed blocked. Switching to audio.");
+    if (isVideoMode && currentTrack) {
+        isVideoMode = false;
+        applyTrackUI(currentTrack, false);
+        playLocal();
+    }
+}
+
+function onHiddenYtError(event) {
+    console.error("YouTube Audio Player Error:", event.data);
+    if (!isVideoMode && currentTrack) {
+        const htmlAudio = document.getElementById('htmlAudioFallback');
+        if (htmlAudio) {
+            console.log("Falling back to HTML5 Audio Stream");
+            const trackKey = currentTrack.yt_id || currentTrack.title;
+            htmlAudio.dataset.loadedTrack = trackKey;
+            fetch(`/api/stream?q=${encodeURIComponent(trackKey)}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (d.stream_url) {
+                        htmlAudio.src = d.stream_url;
+                        htmlAudio.play().catch(e => console.log("Audio fallback error:", e));
+                    }
+                }).catch(e => console.log(e));
+        }
+    }
+}
 
 function handleTrackEnded() {
     if (isLoopMode === 'one') {
@@ -476,7 +508,7 @@ async function performSearch(query) {
                     <button type="button" class="track-action-btn add-queue-btn" title="Add to Queue"><i class="fa-solid fa-plus"></i></button>
                     <button type="button" class="track-action-btn add-playlist-btn" title="Add to Playlist"><i class="fa-solid fa-folder-plus"></i></button>
                     <button type="button" class="track-action-btn play-audio-btn" title="Play Audio"><i class="fa-solid fa-play"></i></button>
-                    <button type="button" class="track-action-btn play-video-btn" title="Play Video"><i class="fa-solid fa-film"></i></button>
+                    ${track.source.toLowerCase() === 'youtube' ? `<button type="button" class="track-action-btn play-video-btn" title="Play Video"><i class="fa-solid fa-film"></i></button>` : ''}
                 </div>
             `;
             
@@ -484,10 +516,14 @@ async function performSearch(query) {
                 e.stopPropagation();
                 playTrack(track, false);
             });
-            el.querySelector('.play-video-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                playTrack(track, true);
-            });
+            
+            const playVideoBtn = el.querySelector('.play-video-btn');
+            if (playVideoBtn) {
+                playVideoBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    playTrack(track, true);
+                });
+            }
             el.querySelector('.add-queue-btn').addEventListener('click', (e) => {
                 e.stopPropagation();
                 addToQueue(track);

@@ -415,12 +415,17 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
                 if info and info.get('entries'):
                     for entry in info['entries']:
                         src_tag = source if source != 'all' else ('spotify' if 'spotify' in entry.get('title','').lower() else 'youtube')
+                        yt_id = entry.get('id', '')
+                        thumb = entry.get('thumbnail')
+                        if not thumb and yt_id:
+                            thumb = f"https://i.ytimg.com/vi/{yt_id}/hqdefault.jpg"
+                            
                         results.append({
                             'title': entry.get('title', 'Unknown Track'),
                             'url': entry.get('url', ''),
-                            'thumbnail': entry.get('thumbnail', ''),
+                            'thumbnail': thumb or '',
                             'duration': entry.get('duration', 0),
-                            'yt_id': entry.get('id', ''),
+                            'yt_id': yt_id,
                             'source': src_tag
                         })
             break # Success, break out of retry loop
