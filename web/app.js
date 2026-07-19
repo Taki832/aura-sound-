@@ -1394,10 +1394,18 @@ function setupLibrary() {
 
     // Playlist Modal Event Listeners
     document.getElementById('closeAddToPlaylistBtn')?.addEventListener('click', () => {
-        document.getElementById('addToPlaylistModal')?.classList.add('hidden');
+        const modal = document.getElementById('addToPlaylistModal');
+        if (modal) {
+            modal.classList.remove('open');
+            modal.classList.add('hidden');
+        }
     });
     document.getElementById('closePlaylistDetailBtn')?.addEventListener('click', () => {
-        document.getElementById('playlistDetailModal')?.classList.add('hidden');
+        const modal = document.getElementById('playlistDetailModal');
+        if (modal) {
+            modal.classList.remove('open');
+            modal.classList.add('hidden');
+        }
     });
     document.getElementById('btnPlayAllPlaylist')?.addEventListener('click', () => {
         playPlaylistTrack(0);
@@ -1413,7 +1421,11 @@ function setupLibrary() {
             });
             const data = await res.json();
             showToast(data.message || "Playlist deleted");
-            document.getElementById('playlistDetailModal').classList.add('hidden');
+            const modal = document.getElementById('playlistDetailModal');
+            if (modal) {
+                modal.classList.remove('open');
+                modal.classList.add('hidden');
+            }
             currentViewingPlaylist = null;
             loadPlaylistsList();
         } catch(e) {
@@ -1528,11 +1540,18 @@ async function loadLikedSongsList() {
 
 // --- Playlist Add & Detail Functions ---
 function openAddToPlaylistModal(track) {
-    if (!currentUser) return;
+    if (!currentUser) {
+        showToast("Please log in to save playlists!");
+        const loginOverlay = document.getElementById('loginModalOverlay');
+        if (loginOverlay) loginOverlay.classList.remove('hidden');
+        setupLoginModal();
+        return;
+    }
     selectedTrackForPlaylist = track;
     const modal = document.getElementById('addToPlaylistModal');
     if (modal) {
         modal.classList.remove('hidden');
+        modal.classList.add('open');
         renderSelectPlaylistsList();
     }
 }
@@ -1593,7 +1612,11 @@ async function renderSelectPlaylistsList() {
                         body: JSON.stringify({ playlist_id: cData.playlist_id, user_id: currentUser.id, track: selectedTrackForPlaylist })
                     });
                     showToast(`Added to "${name}"!`);
-                    document.getElementById('addToPlaylistModal').classList.add('hidden');
+                    const addModal = document.getElementById('addToPlaylistModal');
+                    if (addModal) {
+                        addModal.classList.remove('open');
+                        addModal.classList.add('hidden');
+                    }
                     loadPlaylistsList();
                 }
             } catch(e) {
@@ -1612,7 +1635,11 @@ async function renderSelectPlaylistsList() {
                     });
                     const addData = await addRes.json();
                     showToast(addData.message || "Added to playlist!");
-                    document.getElementById('addToPlaylistModal').classList.add('hidden');
+                    const addModal = document.getElementById('addToPlaylistModal');
+                    if (addModal) {
+                        addModal.classList.remove('open');
+                        addModal.classList.add('hidden');
+                    }
                     loadPlaylistsList();
                 } catch(e) {
                     showToast("Failed to add track");
@@ -1638,7 +1665,10 @@ async function openPlaylistDetail(playlistId) {
         document.getElementById('playlistDetailSub').textContent = `${(playlist.tracks || []).length} songs · ${playlist.is_public ? 'Public' : 'Private'}`;
         
         const modal = document.getElementById('playlistDetailModal');
-        modal.classList.remove('hidden');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('open');
+        }
 
         renderPlaylistTracks(playlist);
     } catch(e) {

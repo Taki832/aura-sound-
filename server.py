@@ -33,7 +33,7 @@ except RuntimeError:
 
 env_url = os.environ.get("MINI_APP_URL", "").strip()
 if not env_url or "ngrok" in env_url:
-    MINI_APP_URL = "https://aura-sound-88gw.onrender.com"
+    MINI_APP_URL = "https://aurasound-ai-sync.onrender.com"
 else:
     MINI_APP_URL = env_url
 
@@ -1259,11 +1259,21 @@ async def main():
         bot_started = False
         for attempt in range(3):
             try:
-                print(f"[1/5] Starting Telegram Bots (attempt {attempt+1}/3, 15s timeout)...")
-                await asyncio.wait_for(python_bot.start(), timeout=15)
-                await asyncio.wait_for(mojo_bot.start(), timeout=15)
+                print(f"[1/5] Starting Telegram Bots (attempt {attempt+1}/3, 45s timeout)...")
+                try:
+                    await asyncio.wait_for(python_bot.start(), timeout=45)
+                    py_me = await python_bot.get_me()
+                    print(f"  ✓ Python Bot Active: @{py_me.username} (ID: {py_me.id})")
+                except Exception as py_err:
+                    print(f"  ⚠ Python Bot startup notice: {py_err}")
 
-                # Register Bot Commands for Telegram GUI popup menu
+                try:
+                    await asyncio.wait_for(mojo_bot.start(), timeout=45)
+                    mojo_me = await mojo_bot.get_me()
+                    print(f"  ✓ Mojo Bot Active: @{mojo_me.username} (ID: {mojo_me.id})")
+                except Exception as mj_err:
+                    print(f"  ⚠ Mojo Bot startup notice: {mj_err}")
+
                 commands_list = [
                     BotCommand("start", "Launch AuraSound AI Mini App"),
                     BotCommand("app", "Launch AuraSound AI Mini App"),
@@ -1272,26 +1282,20 @@ async def main():
                     BotCommand("playlists", "View Saved Playlists"),
                     BotCommand("history", "Listening & Search History"),
                     BotCommand("friends", "Friends & Network"),
-                    BotCommand("search", "Search Live Music"),
+                    BotCommand("search", "Live Music Search"),
                     BotCommand("help", "Command Menu & Guide")
                 ]
                 try:
-                    await python_bot.set_my_commands(commands_list)
-                    await mojo_bot.set_my_commands(commands_list)
+                    if python_bot.is_connected:
+                        await python_bot.set_my_commands(commands_list)
+                    if mojo_bot.is_connected:
+                        await mojo_bot.set_my_commands(commands_list)
                     print("  ✓ Registered Telegram Command Popup Menus")
                 except Exception as cmd_e:
                     print(f"  ⚠ Command registration notice: {cmd_e}")
 
-                py_me = await python_bot.get_me()
-                mojo_me = await mojo_bot.get_me()
-                print(f"  ✓ Python Bot: @{py_me.username} (ID: {py_me.id})")
-                print(f"  ✓ Mojo Bot: @{mojo_me.username} (ID: {mojo_me.id})")
                 bot_started = True
                 break
-            except asyncio.TimeoutError:
-                print(f"  ⚠ Bot startup timed out on attempt {attempt+1}")
-                if attempt < 2:
-                    await asyncio.sleep(2)
             except Exception as e:
                 print(f"  ⚠ Bot startup error on attempt {attempt+1}: {e}")
                 if attempt < 2:
