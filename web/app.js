@@ -73,21 +73,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Setup User Auth
     let authUser = null;
     
-    // 1. Try LocalStorage (persistent saved login)
-    let stored = localStorage.getItem('aurasound_user');
-    if (stored) {
-        try { authUser = JSON.parse(stored); } catch(e) {}
-    }
-    
-    // 2. Try Telegram WebApp
+    // 1. Prioritize Telegram WebApp active user
     if (window.Telegram && window.Telegram.WebApp) {
         try {
             window.Telegram.WebApp.ready();
             window.Telegram.WebApp.expand();
             window.Telegram.WebApp.setHeaderColor('#121212');
         } catch(e) {}
-        if (!authUser && window.Telegram.WebApp.initDataUnsafe?.user) {
+        if (window.Telegram.WebApp.initDataUnsafe?.user) {
             authUser = window.Telegram.WebApp.initDataUnsafe.user;
+        }
+    }
+    
+    // 2. Fallback to LocalStorage for standard browsers
+    if (!authUser) {
+        let stored = localStorage.getItem('aurasound_user');
+        if (stored) {
+            try { authUser = JSON.parse(stored); } catch(e) {}
         }
     }
 
