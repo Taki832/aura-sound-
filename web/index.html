@@ -542,7 +542,7 @@
     </div>
 
     <!-- Hidden audio element for fallback streaming -->
-    <audio id="htmlAudioFallback" style="display:none;" controls></audio>
+    <audio id="htmlAudioFallback" style="position: absolute; width: 1px; height: 1px; opacity: 0.01; pointer-events: none; left: -9999px;" preload="auto"></audio>
 
     <script src="visualizer.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>

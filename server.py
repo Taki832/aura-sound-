@@ -438,7 +438,15 @@ def multi_source_search(query: str, source: str = 'all', limit: int = 6):
 
     return results
 
+stream_url_cache = {}
+
 def get_direct_stream_url(query: str):
+    clean_q = query.strip().lower()
+    if clean_q in stream_url_cache:
+        cached_url, title, thumb, dur, ts = stream_url_cache[clean_q]
+        if time.time() - ts < 3600:
+            return cached_url, title, thumb, dur
+
     opts = {
         'format': 'bestaudio[ext=m4a]/bestaudio/best', 
         'noplaylist': True, 
@@ -456,7 +464,13 @@ def get_direct_stream_url(query: str):
                     v = info['entries'][0]
                 else:
                     v = info
-                return v.get('url'), v.get('title'), v.get('thumbnail', ''), v.get('duration', 0)
+                res_url = v.get('url')
+                res_title = v.get('title')
+                res_thumb = v.get('thumbnail', '')
+                res_dur = v.get('duration', 0)
+                if res_url:
+                    stream_url_cache[clean_q] = (res_url, res_title, res_thumb, res_dur, time.time())
+                return res_url, res_title, res_thumb, res_dur
         except Exception as e:
             print(f"[Direct Audio Stream Error] {e}")
     return None, None, None, 0

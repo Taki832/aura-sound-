@@ -793,6 +793,12 @@ async function playTrack(track, asVideo) {
     currentTrack = track;
     isVideoMode = asVideo;
     
+    // Unlock mobile WebView user gesture for HTML5 Audio
+    const htmlAudio = document.getElementById('htmlAudioFallback');
+    if (htmlAudio && !asVideo) {
+        htmlAudio.play().catch(() => {});
+    }
+
     if (asVideo) {
         fullPlayerOverlay.classList.add('open');
     }
