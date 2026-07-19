@@ -906,6 +906,11 @@ function applyTrackUI(track, asVideo) {
                 htmlAudio.src = proxyUrl;
             }
         }
+        if (isHiddenYtReady && hiddenYtPlayer && track.yt_id) {
+            try {
+                if (hiddenYtPlayer.loadVideoById) hiddenYtPlayer.loadVideoById(track.yt_id);
+            } catch(e) {}
+        }
     }
 }
 
