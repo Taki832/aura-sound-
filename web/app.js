@@ -259,10 +259,11 @@ async function authenticateUser(authUser) {
 
 // --- YouTube API Callbacks ---
 window.onYouTubeIframeAPIReady = function() {
+    const originUrl = window.location.origin;
     ytPlayer = new YT.Player('youtubePlayerHost', {
         height: '100%',
         width: '100%',
-        playerVars: { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'playsinline': 1 },
+        playerVars: { 'autoplay': 0, 'controls': 0, 'disablekb': 1, 'fs': 0, 'rel': 0, 'playsinline': 1, 'origin': originUrl, 'enablejsapi': 1 },
         events: {
             'onReady': () => { isYtReady = true; },
             'onStateChange': onYtStateChange,
@@ -273,7 +274,7 @@ window.onYouTubeIframeAPIReady = function() {
     hiddenYtPlayer = new YT.Player('hiddenAudioPlayerHost', {
         height: '1',
         width: '1',
-        playerVars: { 'autoplay': 0, 'controls': 0, 'playsinline': 1 },
+        playerVars: { 'autoplay': 0, 'controls': 0, 'playsinline': 1, 'origin': originUrl, 'enablejsapi': 1 },
         events: {
             'onReady': () => { isHiddenYtReady = true; },
             'onStateChange': onHiddenYtStateChange,
